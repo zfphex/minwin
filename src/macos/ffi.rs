@@ -192,3 +192,12 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn CGAssociateMouseAndMouseCursorPosition(connected: bool) -> i32;
 }
+
+// NSEventPhase
+pub const NSEventPhaseNone: usize = 0;
+pub const NSEventPhaseBegan: usize = 1 << 0;
+pub const NSEventPhaseStationary: usize = 1 << 1;
+pub const NSEventPhaseChanged: usize = 1 << 2;
+pub const NSEventPhaseEnded: usize = 1 << 3;
+pub const NSEventPhaseCancelled: usize = 1 << 4;
+pub const NSEventPhaseMayBegin: usize = 1 << 5;

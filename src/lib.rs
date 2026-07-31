@@ -28,6 +28,7 @@ pub trait PlatformWindow {
     fn text_input(&self) -> &[char];
     fn dropped_files(&self) -> &[std::path::PathBuf];
     fn scroll_delta(&self) -> (f64, f64);
+    fn scroll_events(&self) -> &[ScrollEvent];
     fn raw_mouse_delta(&self) -> (f64, f64);
     fn modifiers(&self) -> Modifiers;
     fn framebuffer_size(&self) -> (usize, usize);
@@ -287,6 +288,41 @@ pub struct Modifiers {
     pub logo: bool, // Command/Windows key
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ScrollPhase {
+    #[default]
+    None,
+    Began,
+    Changed,
+    Ended,
+    MomentumBegan,
+    MomentumChanged,
+    MomentumEnded,
+}
+
+impl ScrollPhase {
+    pub fn momentum(self) -> bool {
+        matches!(
+            self,
+            ScrollPhase::MomentumBegan | ScrollPhase::MomentumChanged | ScrollPhase::MomentumEnded
+        )
+    }
+
+    pub fn ended(self) -> bool {
+        matches!(self, ScrollPhase::Ended | ScrollPhase::MomentumEnded)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ScrollEvent {
+    pub delta: (f64, f64),
+    pub phase: ScrollPhase,
+    /// Pixel-accurate input from a trackpad, as opposed to a mouse wheel's discrete notches.
+    pub precise: bool,
+    /// When the OS says the event happened, in seconds. 
+    pub timestamp: f64,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct InputState {
     current_keys: [bool; 256],
@@ -301,6 +337,7 @@ pub(crate) struct InputState {
     pressed_keys: Vec<Key>,
     mouse_pos: Option<(f64, f64)>,
     scroll_delta: (f64, f64),
+    scroll_events: Vec<ScrollEvent>,
     raw_mouse_delta: (f64, f64),
     modifiers: Modifiers,
     text_input: Vec<char>,
@@ -322,6 +359,7 @@ impl InputState {
             pressed_keys: Vec::new(),
             mouse_pos: None,
             scroll_delta: (0.0, 0.0),
+            scroll_events: Vec::new(),
             raw_mouse_delta: (0.0, 0.0),
             modifiers: Modifiers::default(),
             text_input: Vec::new(),
@@ -339,6 +377,7 @@ impl InputState {
         self.text_input.clear();
         self.dropped_files.clear();
         self.scroll_delta = (0.0, 0.0);
+        self.scroll_events.clear();
         self.raw_mouse_delta = (0.0, 0.0);
     }
 
@@ -421,6 +460,10 @@ impl InputState {
 
     pub fn scroll_delta(&self) -> (f64, f64) {
         self.scroll_delta
+    }
+
+    pub fn scroll_events(&self) -> &[ScrollEvent] {
+        &self.scroll_events
     }
 
     pub fn raw_mouse_delta(&self) -> (f64, f64) {

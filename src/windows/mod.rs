@@ -65,6 +65,7 @@ unsafe extern "system" {
 #[link(name = "user32")]
 unsafe extern "system" {
     pub fn PostQuitMessage(nExitCode: i32);
+    pub fn GetMessageTime() -> i32;
     pub fn RegisterClassA(lpwndclass: *const WNDCLASSA) -> u16;
     pub fn DispatchMessageA(lpMsg: *const MSG) -> isize;
     pub fn TranslateMessage(lpMsg: *const MSG) -> i32;

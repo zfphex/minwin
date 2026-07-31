@@ -495,6 +495,10 @@ impl PlatformWindow for Window {
         self.input.scroll_delta()
     }
 
+    fn scroll_events(&self) -> &[ScrollEvent] {
+        self.input.scroll_events()
+    }
+
     fn raw_mouse_delta(&self) -> (f64, f64) {
         self.input.raw_mouse_delta()
     }
@@ -869,8 +873,14 @@ pub unsafe extern "system" fn wnd_proc(
                 const WHEEL_DELTA: i16 = 120;
                 let value = (wparam >> 16) as i16;
                 let delta_y = value as f64 / WHEEL_DELTA as f64;
-                window.input.scroll_delta.0 += 0.0;
                 window.input.scroll_delta.1 += delta_y;
+                // Win32 wheel messages carry no gesture.
+                window.input.scroll_events.push(ScrollEvent {
+                    delta: (0.0, delta_y),
+                    phase: ScrollPhase::None,
+                    precise: false,
+                    timestamp: GetMessageTime() as f64 / 1000.0,
+                });
                 return 0;
             }
             WM_KEYDOWN | WM_SYSKEYDOWN => {

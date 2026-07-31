@@ -739,6 +739,10 @@ impl PlatformWindow for Window {
         self.input.scroll_delta()
     }
 
+    fn scroll_events(&self) -> &[ScrollEvent] {
+        self.input.scroll_events()
+    }
+
     fn raw_mouse_delta(&self) -> (f64, f64) {
         self.input.raw_mouse_delta()
     }
@@ -1043,6 +1047,52 @@ unsafe fn translate_event(ns_event: id, input: &mut InputState) {
                 let delta_y = double_func(ns_event, dy_sel);
                 input.scroll_delta.0 += delta_x;
                 input.scroll_delta.1 += delta_y;
+
+                // A scroll event carries the cursor position, and on a fresh window it is the only
+                // event that arrives before the mouse has moved. Without this there is no position
+                // to hit test against, so every scroll is dropped until the mouse moves or clicks.
+                let point_func: unsafe extern "C" fn(id, SEL) -> NSPoint =
+                    std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
+                let loc = point_func(ns_event, sel_registerName(b"locationInWindow\0".as_ptr() as *const _));
+                let mut y = loc.y;
+                let event_window = msg_send_id(ns_event, sel_registerName(b"window\0".as_ptr() as *const _));
+                if !event_window.is_null() {
+                    let content_view =
+                        msg_send_id(event_window, sel_registerName(b"contentView\0".as_ptr() as *const _));
+                    let frame = msg_send_rect(content_view, sel_registerName(b"frame\0".as_ptr() as *const _));
+                    y = frame.size.height - loc.y;
+                }
+                input.mouse_pos = Some((loc.x, y));
+
+                let usize_func: unsafe extern "C" fn(id, SEL) -> usize =
+                    std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
+                let bool_func: unsafe extern "C" fn(id, SEL) -> bool =
+                    std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
+                let phase = usize_func(ns_event, sel_registerName(b"phase\0".as_ptr() as *const _));
+                let momentum = usize_func(ns_event, sel_registerName(b"momentumPhase\0".as_ptr() as *const _));
+                let precise = bool_func(
+                    ns_event,
+                    sel_registerName(b"hasPreciseScrollingDeltas\0".as_ptr() as *const _),
+                );
+
+                // A gesture reports `phase` and leaves `momentumPhase` at None, then the two swap
+                // once the fingers lift and the OS takes over the fling.
+                let phase = match (phase, momentum) {
+                    (_, NSEventPhaseBegan) => ScrollPhase::MomentumBegan,
+                    (_, NSEventPhaseChanged) => ScrollPhase::MomentumChanged,
+                    (_, NSEventPhaseEnded) | (_, NSEventPhaseCancelled) => ScrollPhase::MomentumEnded,
+                    (NSEventPhaseBegan, _) | (NSEventPhaseMayBegin, _) => ScrollPhase::Began,
+                    (NSEventPhaseChanged, _) | (NSEventPhaseStationary, _) => ScrollPhase::Changed,
+                    (NSEventPhaseEnded, _) | (NSEventPhaseCancelled, _) => ScrollPhase::Ended,
+                    _ => ScrollPhase::None,
+                };
+
+                input.scroll_events.push(ScrollEvent {
+                    delta: (delta_x, delta_y),
+                    phase,
+                    precise,
+                    timestamp: double_func(ns_event, sel_registerName(b"timestamp\0".as_ptr() as *const _)),
+                });
             }
             _ => {}
         }
