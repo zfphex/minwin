@@ -36,11 +36,11 @@ pub unsafe fn set_dark_theme(hwnd: isize) {
         return;
     }
 
-    let user32 = unsafe { LoadLibraryA("user32.dll\0".as_ptr() as *const i8) };
+    let user32 = unsafe { LoadLibraryA(c"user32.dll".as_ptr() as *const i8) };
     let proc = unsafe {
         GetProcAddress(
             user32,
-            "SetWindowCompositionAttribute\0".as_ptr() as *const i8,
+            c"SetWindowCompositionAttribute".as_ptr() as *const i8,
         )
     };
     let SetWindow: fn(isize, *mut WINDOWCOMPOSITIONATTRIBDATA) -> i32 =

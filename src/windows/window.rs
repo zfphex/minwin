@@ -176,7 +176,7 @@ impl Window {
             assert!(!dummy_hglrc.is_null());
             assert!(wglMakeCurrent(self.dc, dummy_hglrc) != 0,);
 
-            let ptr = wglGetProcAddress(b"wglCreateContextAttribsARB\0".as_ptr() as *const i8);
+            let ptr = wglGetProcAddress(c"wglCreateContextAttribsARB".as_ptr() as *const i8);
             assert!(!ptr.is_null());
 
             let wgl_create_context_attribs_arb: unsafe extern "system" fn(
@@ -247,7 +247,7 @@ impl Window {
     }
 
     pub unsafe fn set_swap_interval(&self, interval: i32) {
-        let ptr = unsafe { wglGetProcAddress("wglSwapIntervalEXT\0".as_ptr() as *const _) };
+        let ptr = unsafe { wglGetProcAddress(c"wglSwapIntervalEXT".as_ptr() as *const _) };
         assert!(!ptr.is_null());
         let func: unsafe extern "system" fn(i32) -> i32 = unsafe { std::mem::transmute(ptr) };
         unsafe { func(interval) };

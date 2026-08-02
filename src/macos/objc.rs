@@ -49,9 +49,9 @@ pub unsafe fn msg_send_void(obj: id, sel: SEL) {
 // Convert a Rust string to a Cocoa NSString (retaining pointer)
 pub unsafe fn nsstring(s: &str) -> id {
     unsafe {
-        let nsstring_class = objc_getClass(b"NSString\0".as_ptr() as *const _);
-        let alloc_sel = sel_registerName(b"alloc\0".as_ptr() as *const _);
-        let init_sel = sel_registerName(b"initWithBytes:length:encoding:\0".as_ptr() as *const _);
+        let nsstring_class = objc_getClass(c"NSString".as_ptr() as *const _);
+        let alloc_sel = sel_registerName(c"alloc".as_ptr() as *const _);
+        let init_sel = sel_registerName(c"initWithBytes:length:encoding:".as_ptr() as *const _);
 
         let allocated = msg_send_id(nsstring_class, alloc_sel);
         let init_func: unsafe extern "C" fn(id, SEL, *const c_void, usize, usize) -> id =
