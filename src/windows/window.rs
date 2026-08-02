@@ -113,6 +113,7 @@ pub fn create_window(
             render_executor: None,
             native_repaint_requested: false,
             use_gpu,
+            cursor: std::cell::Cell::new(CursorIcon::Arrow),
         };
 
         //Safety: This *should* be pinned.
@@ -142,6 +143,7 @@ pub struct Window {
     pub render_executor: Option<unsafe fn(*mut std::ffi::c_void, &mut Window)>,
     native_repaint_requested: bool,
     pub use_gpu: bool,
+    pub cursor: std::cell::Cell<CursorIcon>,
 }
 
 impl Window {
@@ -613,18 +615,11 @@ impl PlatformWindow for Window {
         }
     }
 
+    //TODO: Allow for users to set custom cursors.
     fn set_cursor_icon(&self, icon: CursorIcon) {
-        let idc = match icon {
-            CursorIcon::Arrow => IDC_ARROW,
-            CursorIcon::IBeam => IDC_IBEAM,
-            CursorIcon::PointingHand => IDC_HAND,
-            CursorIcon::Crosshair => IDC_CROSS,
-            CursorIcon::ResizeLeftRight => IDC_SIZEWE,
-            CursorIcon::ResizeUpDown => IDC_SIZENS,
-            _ => IDC_ARROW,
-        };
+        self.cursor.set(icon);
         unsafe {
-            SetCursor(LoadCursorW(null_mut(), idc));
+            SetCursor(cursor_handle(icon));
         }
     }
 
@@ -801,6 +796,11 @@ pub unsafe extern "system" fn wnd_proc(
             WM_SIZE => {
                 InvalidateRect(hwnd, null(), 0);
                 return 0;
+            }
+            // Without this the class cursor is restored on every move, undoing set_cursor_icon.
+            WM_SETCURSOR if low == HTCLIENT => {
+                SetCursor(cursor_handle(window.cursor.get()));
+                return 1;
             }
             WM_SIZING => {
                 InvalidateRect(hwnd, null(), 0);

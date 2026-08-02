@@ -70,6 +70,9 @@ pub enum CursorIcon {
     Crosshair,
     ResizeLeftRight,
     ResizeUpDown,
+    AutoScroll,
+    AutoScrollUp,
+    AutoScrollDown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

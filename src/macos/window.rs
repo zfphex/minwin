@@ -488,6 +488,9 @@ impl PlatformWindow for Window {
                 CursorIcon::Crosshair => b"crosshairCursor\0".as_ptr(),
                 CursorIcon::ResizeLeftRight => b"resizeLeftRightCursor\0".as_ptr(),
                 CursorIcon::ResizeUpDown => b"resizeUpDownCursor\0".as_ptr(),
+                CursorIcon::AutoScroll => b"resizeUpDownCursor\0".as_ptr(),
+                CursorIcon::AutoScrollUp => b"resizeUpCursor\0".as_ptr(),
+                CursorIcon::AutoScrollDown => b"resizeDownCursor\0".as_ptr(),
             };
             let cursor_sel = sel_registerName(selector as *const _);
             let cursor = msg_send_id(ns_cursor, cursor_sel);

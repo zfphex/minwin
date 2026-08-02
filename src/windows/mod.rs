@@ -11,6 +11,7 @@ pub use std::ptr::{null, null_mut};
 
 mod clipboard;
 mod constants;
+mod cursor;
 mod dark_theme;
 mod gdi;
 mod input;
@@ -18,6 +19,7 @@ mod window;
 
 pub use clipboard::*;
 pub use constants::*;
+pub use cursor::*;
 pub use dark_theme::*;
 pub use gdi::*;
 pub use input::*;
