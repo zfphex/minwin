@@ -114,6 +114,7 @@ pub type CGColorSpaceRef = *mut std::ffi::c_void;
 pub type CGDataProviderRef = *mut std::ffi::c_void;
 pub type CGImageRef = *mut std::ffi::c_void;
 pub type CFTypeRef = *mut std::ffi::c_void;
+pub type CFStringRef = *const std::ffi::c_void;
 
 // Core Graphics Constants
 pub const kCGImageAlphaNoneSkipFirst: u32 = 6;
@@ -123,6 +124,8 @@ pub const kCGBitmapByteOrder32Little: u32 = 2 << 12;
 #[link(name = "CoreGraphics", kind = "framework")]
 #[link(name = "QuartzCore", kind = "framework")]
 unsafe extern "C" {
+    pub static kCGColorSpaceSRGB: CFStringRef;
+    pub fn CGColorSpaceCreateWithName(name: CFStringRef) -> CGColorSpaceRef;
     pub fn CGColorSpaceCreateDeviceRGB() -> CGColorSpaceRef;
     pub fn CGDataProviderCreateWithData(
         info: *mut std::ffi::c_void,

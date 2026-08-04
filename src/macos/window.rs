@@ -387,7 +387,14 @@ impl PlatformWindow for Window {
                 Some(release_provider_data),
             );
 
-            let color_space = CGColorSpaceCreateDeviceRGB();
+            let screen = msg_send_id(self.ns_window, sel_registerName(c"screen".as_ptr() as *const _));
+            let color_space = if screen.is_null() {
+                static FALLBACK: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+                *FALLBACK.get_or_init(|| CGColorSpaceCreateDeviceRGB() as usize) as CGColorSpaceRef
+            } else {
+                let ns_cs = msg_send_id(screen, sel_registerName(c"colorSpace".as_ptr() as *const _));
+                msg_send_id(ns_cs, sel_registerName(c"CGColorSpace".as_ptr() as *const _)) as CGColorSpaceRef
+            };
             let bitmap_info = kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little;
 
             let cg_image = CGImageCreate(
@@ -421,7 +428,6 @@ impl PlatformWindow for Window {
 
             CFRelease(cg_image as CFTypeRef);
             CFRelease(provider as CFTypeRef);
-            CFRelease(color_space as CFTypeRef);
         }
     }
 
