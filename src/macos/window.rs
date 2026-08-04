@@ -84,10 +84,7 @@ pub fn create_window(
             );
 
             let app_menu_item = msg_send_id(
-                msg_send_id(
-                    objc_getClass(c"NSMenuItem".as_ptr() as *const _),
-                    alloc_sel,
-                ),
+                msg_send_id(objc_getClass(c"NSMenuItem".as_ptr() as *const _), alloc_sel),
                 init_sel,
             );
 
@@ -111,10 +108,8 @@ pub fn create_window(
             let quit_title = nsstring("Quit");
             let quit_sel = sel_registerName(c"terminate:".as_ptr() as *const _);
             let key = nsstring("q");
-            let quit_item_alloc = msg_send_id(
-                objc_getClass(c"NSMenuItem".as_ptr() as *const _),
-                alloc_sel,
-            );
+            let quit_item_alloc =
+                msg_send_id(objc_getClass(c"NSMenuItem".as_ptr() as *const _), alloc_sel);
 
             let init_quit_func: unsafe extern "C" fn(id, SEL, id, SEL, id) -> id =
                 std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
@@ -217,10 +212,7 @@ pub fn create_window(
         );
 
         if fullscreen == Fullscreen::None && position == WindowPosition::Centered {
-            msg_send_void(
-                ns_window,
-                sel_registerName(c"center".as_ptr() as *const _),
-            );
+            msg_send_void(ns_window, sel_registerName(c"center".as_ptr() as *const _));
         }
 
         if style == WindowStyle::Transparent {
@@ -322,8 +314,7 @@ pub fn create_window(
             objc_getClass(c"NSApplication".as_ptr() as *const _),
             sel_registerName(c"sharedApplication".as_ptr() as *const _),
         );
-        let activate_sel =
-            sel_registerName(c"activateIgnoringOtherApps:".as_ptr() as *const _);
+        let activate_sel = sel_registerName(c"activateIgnoringOtherApps:".as_ptr() as *const _);
         let activate: unsafe extern "C" fn(id, SEL, BOOL) =
             std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
         activate(ns_app, activate_sel, YES);
@@ -547,10 +538,7 @@ impl PlatformWindow for Window {
                 return;
             }
 
-            msg_send_id(
-                pb,
-                sel_registerName(c"clearContents".as_ptr() as *const _),
-            );
+            msg_send_id(pb, sel_registerName(c"clearContents".as_ptr() as *const _));
 
             let type_ns = nsstring("public.utf8-plain-text");
             let text_ns = nsstring(text);
@@ -564,30 +552,61 @@ impl PlatformWindow for Window {
 
     fn focused(&self) -> bool {
         unsafe {
-            let func: unsafe extern "C" fn(id, SEL) -> BOOL = std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
-            func(self.ns_window, sel_registerName(c"isKeyWindow".as_ptr() as *const _)) != 0
+            let func: unsafe extern "C" fn(id, SEL) -> BOOL =
+                std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
+            func(
+                self.ns_window,
+                sel_registerName(c"isKeyWindow".as_ptr() as *const _),
+            ) != 0
         }
     }
 
     fn window_style(&mut self, style: WindowStyle) {
         let mask = match style {
-            WindowStyle::Standard => NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable,
+            WindowStyle::Standard => {
+                NSWindowStyleMaskTitled
+                    | NSWindowStyleMaskClosable
+                    | NSWindowStyleMaskMiniaturizable
+                    | NSWindowStyleMaskResizable
+            }
             WindowStyle::Borderless | WindowStyle::Transparent => NSWindowStyleMaskBorderless,
         };
-        unsafe { msg_send_id_usize_void(self.ns_window, sel_registerName(c"setStyleMask:".as_ptr() as *const _), mask) };
+        unsafe {
+            msg_send_id_usize_void(
+                self.ns_window,
+                sel_registerName(c"setStyleMask:".as_ptr() as *const _),
+                mask,
+            )
+        };
     }
 
     fn fullscreen_mode(&mut self, mode: Fullscreen) {
         match mode {
             Fullscreen::None => self.window_style(WindowStyle::Standard),
-            Fullscreen::Workspace => unsafe { msg_send_id_id_void(self.ns_window, sel_registerName(c"toggleFullScreen:".as_ptr() as *const _), std::ptr::null_mut()) },
+            Fullscreen::Workspace => unsafe {
+                msg_send_id_id_void(
+                    self.ns_window,
+                    sel_registerName(c"toggleFullScreen:".as_ptr() as *const _),
+                    std::ptr::null_mut(),
+                )
+            },
             Fullscreen::Monitor => {
                 self.window_style(WindowStyle::Borderless);
                 unsafe {
-                    let screen = msg_send_id(objc_getClass(c"NSScreen".as_ptr() as *const _), sel_registerName(c"mainScreen".as_ptr() as *const _));
-                    let frame = msg_send_rect(screen, sel_registerName(c"frame".as_ptr() as *const _));
-                    let set_frame: unsafe extern "C" fn(id, SEL, NSRect, BOOL) = std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
-                    set_frame(self.ns_window, sel_registerName(c"setFrame:display:".as_ptr() as *const _), frame, YES);
+                    let screen = msg_send_id(
+                        objc_getClass(c"NSScreen".as_ptr() as *const _),
+                        sel_registerName(c"mainScreen".as_ptr() as *const _),
+                    );
+                    let frame =
+                        msg_send_rect(screen, sel_registerName(c"frame".as_ptr() as *const _));
+                    let set_frame: unsafe extern "C" fn(id, SEL, NSRect, BOOL) =
+                        std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
+                    set_frame(
+                        self.ns_window,
+                        sel_registerName(c"setFrame:display:".as_ptr() as *const _),
+                        frame,
+                        YES,
+                    );
                 }
             }
         }
@@ -622,10 +641,7 @@ impl PlatformWindow for Window {
             // Allocate an autorelease pool for this tick
             let pool_class = objc_getClass(c"NSAutoreleasePool".as_ptr() as *const _);
             let pool = msg_send_id(
-                msg_send_id(
-                    pool_class,
-                    sel_registerName(c"alloc".as_ptr() as *const _),
-                ),
+                msg_send_id(pool_class, sel_registerName(c"alloc".as_ptr() as *const _)),
                 sel_registerName(c"init".as_ptr() as *const _),
             );
 
@@ -811,7 +827,7 @@ impl PlatformWindow for Window {
             next_event_func(
                 ns_app,
                 sel_registerName(
-                    c"nextEventMatchingMask:untilDate:inMode:dequeue:".as_ptr() as *const _,
+                    c"nextEventMatchingMask:untilDate:inMode:dequeue:".as_ptr() as *const _
                 ),
                 NSEventMaskAny,
                 distant_future,
@@ -996,8 +1012,7 @@ unsafe fn translate_event(ns_event: id, input: &mut InputState) {
                         || event_type == NSEventTypeOtherMouseDown
                     {
                         // AppKit reports multi-click count using system double-click interval.
-                        let click_count_sel =
-                            sel_registerName(c"clickCount".as_ptr() as *const _);
+                        let click_count_sel = sel_registerName(c"clickCount".as_ptr() as *const _);
                         let click_count_func: unsafe extern "C" fn(id, SEL) -> isize =
                             std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
                         let click_count = click_count_func(ns_event, click_count_sel);
@@ -1087,13 +1102,22 @@ unsafe fn translate_event(ns_event: id, input: &mut InputState) {
                 // to hit test against, so every scroll is dropped until the mouse moves or clicks.
                 let point_func: unsafe extern "C" fn(id, SEL) -> NSPoint =
                     std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
-                let loc = point_func(ns_event, sel_registerName(c"locationInWindow".as_ptr() as *const _));
+                let loc = point_func(
+                    ns_event,
+                    sel_registerName(c"locationInWindow".as_ptr() as *const _),
+                );
                 let mut y = loc.y;
-                let event_window = msg_send_id(ns_event, sel_registerName(c"window".as_ptr() as *const _));
+                let event_window =
+                    msg_send_id(ns_event, sel_registerName(c"window".as_ptr() as *const _));
                 if !event_window.is_null() {
-                    let content_view =
-                        msg_send_id(event_window, sel_registerName(c"contentView".as_ptr() as *const _));
-                    let frame = msg_send_rect(content_view, sel_registerName(c"frame".as_ptr() as *const _));
+                    let content_view = msg_send_id(
+                        event_window,
+                        sel_registerName(c"contentView".as_ptr() as *const _),
+                    );
+                    let frame = msg_send_rect(
+                        content_view,
+                        sel_registerName(c"frame".as_ptr() as *const _),
+                    );
                     y = frame.size.height - loc.y;
                 }
                 input.mouse_pos = Some((loc.x, y));
@@ -1103,7 +1127,10 @@ unsafe fn translate_event(ns_event: id, input: &mut InputState) {
                 let bool_func: unsafe extern "C" fn(id, SEL) -> bool =
                     std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
                 let phase = usize_func(ns_event, sel_registerName(c"phase".as_ptr() as *const _));
-                let momentum = usize_func(ns_event, sel_registerName(c"momentumPhase".as_ptr() as *const _));
+                let momentum = usize_func(
+                    ns_event,
+                    sel_registerName(c"momentumPhase".as_ptr() as *const _),
+                );
                 let precise = bool_func(
                     ns_event,
                     sel_registerName(c"hasPreciseScrollingDeltas".as_ptr() as *const _),
@@ -1114,7 +1141,9 @@ unsafe fn translate_event(ns_event: id, input: &mut InputState) {
                 let phase = match (phase, momentum) {
                     (_, NSEventPhaseBegan) => ScrollPhase::MomentumBegan,
                     (_, NSEventPhaseChanged) => ScrollPhase::MomentumChanged,
-                    (_, NSEventPhaseEnded) | (_, NSEventPhaseCancelled) => ScrollPhase::MomentumEnded,
+                    (_, NSEventPhaseEnded) | (_, NSEventPhaseCancelled) => {
+                        ScrollPhase::MomentumEnded
+                    }
                     (NSEventPhaseBegan, _) | (NSEventPhaseMayBegin, _) => ScrollPhase::Began,
                     (NSEventPhaseChanged, _) | (NSEventPhaseStationary, _) => ScrollPhase::Changed,
                     (NSEventPhaseEnded, _) | (NSEventPhaseCancelled, _) => ScrollPhase::Ended,
@@ -1125,7 +1154,10 @@ unsafe fn translate_event(ns_event: id, input: &mut InputState) {
                     delta: (delta_x, delta_y),
                     phase,
                     precise,
-                    timestamp: double_func(ns_event, sel_registerName(c"timestamp".as_ptr() as *const _)),
+                    timestamp: double_func(
+                        ns_event,
+                        sel_registerName(c"timestamp".as_ptr() as *const _),
+                    ),
                 });
             }
             _ => {}
@@ -1327,10 +1359,7 @@ fn stop_tracking_repaint_timer() {
         let timer = cell.replace(nil);
         if !timer.is_null() {
             unsafe {
-                msg_send_id(
-                    timer,
-                    sel_registerName(c"invalidate".as_ptr() as *const _),
-                );
+                msg_send_id(timer, sel_registerName(c"invalidate".as_ptr() as *const _));
             }
         }
     });
