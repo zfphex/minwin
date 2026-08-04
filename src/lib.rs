@@ -36,6 +36,7 @@ pub trait PlatformWindow {
     fn framebuffer_size(&self) -> (usize, usize);
     fn framebuffer(&mut self) -> &mut [u32];
     fn present(&self);
+    fn present_damage(&self, damage: &[Rect]);
     fn scale_factor(&self) -> f64;
     fn content_size(&self) -> (usize, usize);
     #[inline(always)]

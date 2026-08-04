@@ -468,6 +468,58 @@ impl PlatformWindow for Window {
         }
     }
 
+    fn present_damage(&self, damage: &[Rect]) {
+        if self.use_gpu || damage.is_empty() {
+            self.present();
+            return;
+        }
+
+        let client_area = self.client_area();
+        if client_area.width == 0
+            || client_area.height == 0
+            || self.area.width == 0
+            || self.area.height == 0
+            || self.buffer.is_empty()
+        {
+            return;
+        }
+
+        if client_area.width != self.area.width || client_area.height != self.area.height {
+            self.present();
+            return;
+        }
+
+        unsafe {
+            for rect in damage {
+                let rect = rect.intersection(self.area);
+                if rect.is_empty() {
+                    continue;
+                }
+                // Describe just the rect's rows as their own top-down bitmap, keeping the
+                // full framebuffer width as the stride. Consuming every scanline of that
+                // sub-bitmap sidesteps the question of which end GDI measures ySrc from,
+                // which is ambiguous for top-down DIBs and differs from the full present.
+                let strip = BITMAPINFO::new(self.area.width, rect.height);
+                let offset = rect.y as usize * self.area.width as usize;
+                StretchDIBits(
+                    self.dc,
+                    rect.x,
+                    rect.y,
+                    rect.width,
+                    rect.height,
+                    rect.x,
+                    0,
+                    rect.width,
+                    rect.height,
+                    self.buffer.as_ptr().add(offset) as *const c_void,
+                    &strip,
+                    0,
+                    SRCCOPY,
+                );
+            }
+        }
+    }
+
     fn scale_factor(&self) -> f64 {
         self.display_scale as f64
     }

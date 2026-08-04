@@ -425,6 +425,10 @@ impl PlatformWindow for Window {
         }
     }
 
+    fn present_damage(&self, _damage: &[Rect]) {
+        self.present();
+    }
+
     fn scale_factor(&self) -> f64 {
         unsafe {
             let sel = sel_registerName(c"backingScaleFactor".as_ptr() as *const _);
