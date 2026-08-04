@@ -38,6 +38,14 @@ pub trait PlatformWindow {
     fn present(&self);
     fn scale_factor(&self) -> f64;
     fn content_size(&self) -> (usize, usize);
+    #[inline(always)]
+    fn width(&self) -> usize {
+        self.content_size().0
+    }
+    #[inline(always)]
+    fn height(&self) -> usize {
+        self.content_size().1
+    }
     fn wait_for_vsync(&self);
     /// Block the calling thread until the OS queues a new window event.
     fn wait_for_event(&self);
