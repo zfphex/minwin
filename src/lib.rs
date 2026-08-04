@@ -635,11 +635,23 @@ impl Rect {
     pub const fn is_empty(self) -> bool {
         self.width <= 0 || self.height <= 0
     }
+    #[inline(always)]
     pub fn scale(self, scale: f32) -> Rect {
-        let x = (self.x as f32 * scale).round() as i32;
-        let y = (self.y as f32 * scale).round() as i32;
-        let right = (self.right() as f32 * scale).round() as i32;
-        let bottom = (self.bottom() as f32 * scale).round() as i32;
+        if scale == 1.0 {
+            return self;
+        }
+        #[inline(always)]
+        fn fast_round(v: f32) -> i32 {
+            if v >= 0.0 {
+                (v + 0.5) as i32
+            } else {
+                (v - 0.5) as i32
+            }
+        }
+        let x = fast_round(self.x as f32 * scale);
+        let y = fast_round(self.y as f32 * scale);
+        let right = fast_round(self.right() as f32 * scale);
+        let bottom = fast_round(self.bottom() as f32 * scale);
         Rect::from_xyxy(x, y, right, bottom)
     }
     pub const fn intersects(&self, other: Rect) -> bool {
