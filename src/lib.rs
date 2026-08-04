@@ -626,12 +626,15 @@ impl Rect {
         self.height = height;
         self
     }
+    #[inline(always)]
     pub const fn right(&self) -> i32 {
-        self.x.saturating_add(self.width)
+        self.x.wrapping_add(self.width)
     }
+    #[inline(always)]
     pub const fn bottom(&self) -> i32 {
-        self.y.saturating_add(self.height)
+        self.y.wrapping_add(self.height)
     }
+    #[inline(always)]
     pub const fn is_empty(self) -> bool {
         self.width <= 0 || self.height <= 0
     }
@@ -654,15 +657,18 @@ impl Rect {
         let bottom = fast_round(self.bottom() as f32 * scale);
         Rect::from_xyxy(x, y, right, bottom)
     }
+    #[inline(always)]
     pub const fn intersects(&self, other: Rect) -> bool {
         self.x < other.right()
             && self.right() > other.x
             && self.y < other.bottom()
             && self.bottom() > other.y
     }
+    #[inline(always)]
     pub const fn contains(&self, x: i32, y: i32) -> bool {
         x >= self.x && x < self.right() && y >= self.y && y < self.bottom()
     }
+    #[inline(always)]
     pub fn intersection(self, other: Rect) -> Rect {
         let x0 = self.x.max(other.x);
         let y0 = self.y.max(other.y);
@@ -674,11 +680,9 @@ impl Rect {
             Rect::default()
         }
     }
-    pub fn clamp(self, bounds: Rect) -> Rect {
-        self.intersection(bounds)
-    }
+    #[inline(always)]
     pub fn clamp_to_size(self, width: i32, height: i32) -> Rect {
-        self.clamp(Rect::new(0, 0, width, height))
+        self.intersection(Rect::new(0, 0, width, height))
     }
     pub const fn inner(&self, w: i32, h: i32) -> Rect {
         Rect {
