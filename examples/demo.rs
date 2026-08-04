@@ -10,10 +10,13 @@ fn main() {
     println!("  [G] - Toggle cursor grab/lock");
     println!("  [P] - Copy 'Hello from minwin!' to clipboard");
     println!("  [O] - Read and print clipboard contents");
+    println!("  [T] - Change window title");
     println!("  [Drop Files] - Drop files onto the window to print their paths");
 
     let mut frame_count = 0;
     let mut cursor_index = 0;
+    let mut title_index = 0;
+    let titles = ["Demo - Title A", "Demo - Title B", "Demo - Title C"];
     let cursor_icons = [
         CursorIcon::Arrow,
         CursorIcon::IBeam,
@@ -28,7 +31,7 @@ fn main() {
 
     while window.open() {
         window.draw(|win| {
-            let (w, h) = win.content_size();
+            let (w, h) = win.scaled_size();
             let scale = win.scale_factor() as f32;
             let w = (w as f32 * scale).round() as usize;
             let h = (h as f32 * scale).round() as usize;
@@ -83,6 +86,12 @@ fn main() {
                     if let Some(text) = window.get_clipboard_text() {
                         println!("Read text from clipboard: {:?}", text);
                     }
+                }
+                Key::Char('T') => {
+                    title_index = (title_index + 1) % titles.len();
+                    let new_title = titles[title_index];
+                    window.set_title(new_title);
+                    println!("Set title to {:?}", new_title);
                 }
                 _ => {}
             }

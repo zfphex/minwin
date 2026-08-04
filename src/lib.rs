@@ -33,19 +33,19 @@ pub trait PlatformWindow {
     fn scroll_events(&self) -> &[ScrollEvent];
     fn raw_mouse_delta(&self) -> (f64, f64);
     fn modifiers(&self) -> Modifiers;
-    fn framebuffer_size(&self) -> (usize, usize);
+    fn size(&self) -> (usize, usize);
     fn framebuffer(&mut self) -> &mut [u32];
     fn present(&self);
     fn present_damage(&self, damage: &[Rect]);
     fn scale_factor(&self) -> f64;
-    fn content_size(&self) -> (usize, usize);
+    fn scaled_size(&self) -> (usize, usize);
     #[inline(always)]
     fn width(&self) -> usize {
-        self.content_size().0
+        self.scaled_size().0
     }
     #[inline(always)]
     fn height(&self) -> usize {
-        self.content_size().1
+        self.scaled_size().1
     }
     fn wait_for_vsync(&self);
     /// Block the calling thread until the OS queues a new window event.
@@ -55,6 +55,7 @@ pub trait PlatformWindow {
     fn set_cursor_icon(&self, icon: CursorIcon);
     fn get_clipboard_text(&self) -> Option<String>;
     fn set_clipboard_text(&self, text: &str);
+    fn set_title(&self, title: &str);
     fn focused(&self) -> bool;
 }
 

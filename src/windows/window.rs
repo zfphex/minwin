@@ -416,7 +416,7 @@ impl PlatformWindow for Window {
     }
 
     fn framebuffer(&mut self) -> &mut [u32] {
-        let (width, height) = self.framebuffer_size();
+        let (width, height) = self.size();
 
         if self.buffer.len() != width * height {
             self.buffer.resize(width * height, 0);
@@ -427,7 +427,7 @@ impl PlatformWindow for Window {
         &mut self.buffer
     }
 
-    fn framebuffer_size(&self) -> (usize, usize) {
+    fn size(&self) -> (usize, usize) {
         let rect = self.client_area();
         (rect.width.max(0) as usize, rect.height.max(0) as usize)
     }
@@ -524,7 +524,7 @@ impl PlatformWindow for Window {
         self.display_scale as f64
     }
 
-    fn content_size(&self) -> (usize, usize) {
+    fn scaled_size(&self) -> (usize, usize) {
         let rect = self.client_area();
         let scale = self.scale_factor() as f32;
         (
@@ -600,6 +600,14 @@ impl PlatformWindow for Window {
 
     fn set_clipboard_text(&self, text: &str) {
         copy_to_clipboard(text);
+    }
+
+    fn set_title(&self, title: &str) {
+        if let Ok(c_title) = std::ffi::CString::new(title) {
+            unsafe {
+                SetWindowTextA(self.hwnd, c_title.as_ptr() as *const u8);
+            }
+        }
     }
 
     fn focused(&self) -> bool {

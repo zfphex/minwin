@@ -345,7 +345,7 @@ pub fn create_window(
 
 impl PlatformWindow for Window {
     fn framebuffer(&mut self) -> &mut [u32] {
-        let (w, h) = self.framebuffer_size();
+        let (w, h) = self.size();
         let expected_size = w * h;
 
         // Dynamically resize the internal buffer if the window size changes
@@ -358,8 +358,8 @@ impl PlatformWindow for Window {
         &mut self.buffer
     }
 
-    fn framebuffer_size(&self) -> (usize, usize) {
-        let (content_width, content_height) = self.content_size();
+    fn size(&self) -> (usize, usize) {
+        let (content_width, content_height) = self.scaled_size();
         let scale = self.scale_factor();
         (
             (content_width as f64 * scale).round() as usize,
@@ -444,7 +444,7 @@ impl PlatformWindow for Window {
         }
     }
 
-    fn content_size(&self) -> (usize, usize) {
+    fn scaled_size(&self) -> (usize, usize) {
         unsafe {
             let frame_sel = sel_registerName(c"frame".as_ptr() as *const _);
             let frame = msg_send_rect(self.ns_view, frame_sel);
@@ -557,6 +557,17 @@ impl PlatformWindow for Window {
             let set_func: unsafe extern "C" fn(id, SEL, id, id) -> BOOL =
                 std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
             set_func(pb, set_sel, text_ns, type_ns);
+        }
+    }
+
+    fn set_title(&self, title: &str) {
+        unsafe {
+            let title_ns = nsstring(title);
+            msg_send_id_id_void(
+                self.ns_window,
+                sel_registerName(c"setTitle:".as_ptr() as *const _),
+                title_ns,
+            );
         }
     }
 
