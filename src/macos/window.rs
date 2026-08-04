@@ -51,7 +51,7 @@ pub fn create_window(
         None => WindowPosition::Centered,
     };
 
-    let fullscreen = FullscreenMode::None;
+    let fullscreen = Fullscreen::None;
     let width = width as f64;
     let height = height as f64;
 
@@ -160,11 +160,11 @@ pub fn create_window(
             WindowStyle::Borderless | WindowStyle::Transparent => NSWindowStyleMaskBorderless,
         };
 
-        if fullscreen == FullscreenMode::Workspace {
+        if fullscreen == Fullscreen::Workspace {
             style_mask |= NSWindowStyleMaskFullScreen;
         }
 
-        if fullscreen == FullscreenMode::MonitorFit {
+        if fullscreen == Fullscreen::Monitor {
             let main_screen = msg_send_id(
                 objc_getClass(c"NSScreen".as_ptr() as *const _),
                 sel_registerName(c"mainScreen".as_ptr() as *const _),
@@ -177,7 +177,7 @@ pub fn create_window(
         }
 
         let rect = match (fullscreen, position) {
-            (FullscreenMode::None, WindowPosition::TopLeft { x, y }) => {
+            (Fullscreen::None, WindowPosition::TopLeft { x, y }) => {
                 let main_screen = msg_send_id(
                     objc_getClass(c"NSScreen".as_ptr() as *const _),
                     sel_registerName(c"mainScreen".as_ptr() as *const _),
@@ -216,7 +216,7 @@ pub fn create_window(
             NO,
         );
 
-        if fullscreen == FullscreenMode::None && position == WindowPosition::Centered {
+        if fullscreen == Fullscreen::None && position == WindowPosition::Centered {
             msg_send_void(
                 ns_window,
                 sel_registerName(c"center".as_ptr() as *const _),
@@ -271,7 +271,7 @@ pub fn create_window(
             ns_view,
         );
 
-        if fullscreen == FullscreenMode::Workspace {
+        if fullscreen == Fullscreen::Workspace {
             // NSWindowCollectionBehaviorFullScreenPrimary = 1 << 7
             msg_send_id_usize_void(
                 ns_window,
@@ -559,6 +559,37 @@ impl PlatformWindow for Window {
             let set_func: unsafe extern "C" fn(id, SEL, id, id) -> BOOL =
                 std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
             set_func(pb, set_sel, text_ns, type_ns);
+        }
+    }
+
+    fn focused(&self) -> bool {
+        unsafe {
+            let func: unsafe extern "C" fn(id, SEL) -> BOOL = std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
+            func(self.ns_window, sel_registerName(c"isKeyWindow".as_ptr() as *const _)) != 0
+        }
+    }
+
+    fn window_style(&mut self, style: WindowStyle) {
+        let mask = match style {
+            WindowStyle::Standard => NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable,
+            WindowStyle::Borderless | WindowStyle::Transparent => NSWindowStyleMaskBorderless,
+        };
+        unsafe { msg_send_id_usize_void(self.ns_window, sel_registerName(c"setStyleMask:".as_ptr() as *const _), mask) };
+    }
+
+    fn fullscreen_mode(&mut self, mode: Fullscreen) {
+        match mode {
+            Fullscreen::None => self.window_style(WindowStyle::Standard),
+            Fullscreen::Workspace => unsafe { msg_send_id_id_void(self.ns_window, sel_registerName(c"toggleFullScreen:".as_ptr() as *const _), std::ptr::null_mut()) },
+            Fullscreen::Monitor => {
+                self.window_style(WindowStyle::Borderless);
+                unsafe {
+                    let screen = msg_send_id(objc_getClass(c"NSScreen".as_ptr() as *const _), sel_registerName(c"mainScreen".as_ptr() as *const _));
+                    let frame = msg_send_rect(screen, sel_registerName(c"frame".as_ptr() as *const _));
+                    let set_frame: unsafe extern "C" fn(id, SEL, NSRect, BOOL) = std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
+                    set_frame(self.ns_window, sel_registerName(c"setFrame:display:".as_ptr() as *const _), frame, YES);
+                }
+            }
         }
     }
 

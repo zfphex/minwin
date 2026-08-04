@@ -14,6 +14,8 @@ pub trait PlatformWindow {
         F: FnMut(&mut Self);
     fn open(&self) -> bool;
     fn close(&mut self);
+    fn window_style(&mut self, style: WindowStyle);
+    fn fullscreen_mode(&mut self, mode: Fullscreen);
     fn is_down(&self, key: Key) -> bool;
     fn is_up(&self, key: Key) -> bool;
     fn pressed(&self, key: Key) -> bool;
@@ -44,6 +46,7 @@ pub trait PlatformWindow {
     fn set_cursor_icon(&self, icon: CursorIcon);
     fn get_clipboard_text(&self) -> Option<String>;
     fn set_clipboard_text(&self, text: &str);
+    fn focused(&self) -> bool;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,10 +57,11 @@ pub enum WindowStyle {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FullscreenMode {
+pub enum Fullscreen {
     None,
+    ///Same as Monitor on Windows.
     Workspace,
-    MonitorFit,
+    Monitor,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -322,7 +326,7 @@ pub struct ScrollEvent {
     pub phase: ScrollPhase,
     /// Pixel-accurate input from a trackpad, as opposed to a mouse wheel's discrete notches.
     pub precise: bool,
-    /// When the OS says the event happened, in seconds. 
+    /// When the OS says the event happened, in seconds.
     pub timestamp: f64,
 }
 

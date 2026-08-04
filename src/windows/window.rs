@@ -129,21 +129,21 @@ pub fn create_window(
 #[derive(Debug)]
 pub struct Window {
     pub hwnd: isize,
+    pub hglrc: HGLRC,
     pub display_scale: f32,
     pub dc: *mut c_void,
     //Might need to be resized before use.
     buffer: Vec<u32>,
-    pub bitmap: BITMAPINFO,
-    pub area: Rect,
+    bitmap: BITMAPINFO,
+    area: Rect,
     open: bool,
     input: InputState,
-    pub hglrc: HGLRC,
-    pub focused: bool,
-    pub render_callback: *mut std::ffi::c_void,
-    pub render_executor: Option<unsafe fn(*mut std::ffi::c_void, &mut Window)>,
+    focused: bool,
+    render_callback: *mut std::ffi::c_void,
+    render_executor: Option<unsafe fn(*mut std::ffi::c_void, &mut Window)>,
     native_repaint_requested: bool,
-    pub use_gpu: bool,
-    pub cursor: std::cell::Cell<CursorIcon>,
+    use_gpu: bool,
+    cursor: std::cell::Cell<CursorIcon>,
 }
 
 impl Window {
@@ -253,134 +253,32 @@ impl Window {
         unsafe { func(interval) };
     }
 
-    ///Updates the width and height based on the display scale.
-    pub fn rescale_window(&self) {
-        let area = self.client_area();
-        let (width, height) = if self.display_scale == 1.0 {
-            (
-                area.width as f32 / self.display_scale,
-                area.height as f32 / self.display_scale,
-            )
-        } else {
-            (
-                area.width as f32 * self.display_scale,
-                area.height as f32 * self.display_scale,
-            )
-        };
-
-        unsafe {
-            SetWindowPos(
-                self.hwnd,
-                0,
-                area.x,
-                area.y,
-                width as i32,
-                height as i32,
-                SWP_FRAMECHANGED,
-            )
-        };
-    }
-
-    pub const fn display_scale(&self) -> f32 {
-        self.display_scale
-    }
-
-    pub fn set_title(&self, title: &str) {
-        let title_c = std::ffi::CString::new(title).unwrap();
-        unsafe {
-            SetWindowTextA(self.hwnd, title_c.as_ptr() as *const u8);
-        }
-    }
-
-    pub fn client_area(&self) -> Rect {
+    fn client_area(&self) -> Rect {
         let mut rect = RECT::default();
         let _ = unsafe { GetClientRect(self.hwnd, &mut rect) };
         Rect::from_windows(rect)
     }
 
-    pub fn width(&self) -> usize {
-        self.area.width.max(0) as usize
-    }
+    //  fn reset_style(&mut self) {
+    //     unsafe {
+    //         SetWindowLongPtrA(
+    //             self.hwnd,
+    //             GWL_STYLE,
+    //             get_style_flags(WindowStyle::Standard).0 as isize,
+    //         );
 
-    pub fn height(&self) -> usize {
-        self.area.height.max(0) as usize
-    }
-
-    pub fn borderless(&mut self) {
-        unsafe {
-            SetWindowLongPtrA(
-                self.hwnd,
-                GWL_STYLE,
-                get_style_flags(WindowStyle::Borderless).0 as isize,
-            );
-
-            //Update the window area without moving or resizing it.
-            SetWindowPos(
-                self.hwnd,
-                0,
-                0,
-                0,
-                0,
-                0,
-                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE,
-            );
-        };
-    }
-
-    pub fn fullscreen(&mut self) {
-        unsafe {
-            const MONITOR_DEFAULTTOPRIMARY: u32 = 0x00000001;
-            let monitor = MonitorFromWindow(self.hwnd, MONITOR_DEFAULTTOPRIMARY);
-            let mut monitor_info: MONITORINFO = std::mem::zeroed();
-            monitor_info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
-            assert!(GetMonitorInfoA(monitor, &mut monitor_info) != 0);
-
-            let style = get_style_flags(WindowStyle::Borderless).0 | WS_MAXIMIZE;
-            SetWindowLongPtrA(self.hwnd, GWL_STYLE, style as isize);
-
-            let x = monitor_info.rcMonitor.left;
-            let y = monitor_info.rcMonitor.top;
-            let width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
-            let height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
-
-            SetWindowPos(self.hwnd, 0, x, y, width, height, SWP_FRAMECHANGED);
-        };
-    }
-
-    pub fn set_pos(&mut self, x: usize, y: usize, width: usize, height: usize, flags: u32) {
-        unsafe {
-            SetWindowPos(
-                self.hwnd,
-                0,
-                x as i32,
-                y as i32,
-                width as i32,
-                height as i32,
-                flags,
-            );
-        }
-    }
-
-    pub fn reset_style(&mut self) {
-        unsafe {
-            SetWindowLongPtrA(
-                self.hwnd,
-                GWL_STYLE,
-                get_style_flags(WindowStyle::Standard).0 as isize,
-            );
-
-            //Update the window area without moving or resizing it.
-            SetWindowPos(
-                self.hwnd,
-                0,
-                0,
-                0,
-                0,
-                0,
-                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE,
-            );
-        };
-    }
+    //         //Update the window area without moving or resizing it.
+    //         SetWindowPos(
+    //             self.hwnd,
+    //             0,
+    //             0,
+    //             0,
+    //             0,
+    //             0,
+    //             SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE,
+    //         );
+    //     };
+    // }
 }
 
 impl PlatformWindow for Window {
@@ -650,6 +548,51 @@ impl PlatformWindow for Window {
 
     fn set_clipboard_text(&self, text: &str) {
         copy_to_clipboard(text);
+    }
+
+    fn focused(&self) -> bool {
+        self.focused
+    }
+
+    fn fullscreen_mode(&mut self, mode: Fullscreen) {
+        if mode == Fullscreen::None {
+            return self.window_style(WindowStyle::Standard);
+        }
+        unsafe {
+            let monitor = MonitorFromWindow(self.hwnd, 1);
+            let mut info: MONITORINFO = std::mem::zeroed();
+            info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+            GetMonitorInfoA(monitor, &mut info);
+            SetWindowLongPtrA(
+                self.hwnd,
+                GWL_STYLE,
+                (get_style_flags(WindowStyle::Borderless).0 | WS_MAXIMIZE) as isize,
+            );
+            SetWindowPos(
+                self.hwnd,
+                0,
+                info.rcMonitor.left,
+                info.rcMonitor.top,
+                info.rcMonitor.right - info.rcMonitor.left,
+                info.rcMonitor.bottom - info.rcMonitor.top,
+                SWP_FRAMECHANGED,
+            );
+        }
+    }
+
+    fn window_style(&mut self, style: WindowStyle) {
+        unsafe {
+            SetWindowLongPtrA(self.hwnd, GWL_STYLE, get_style_flags(style).0 as isize);
+            SetWindowPos(
+                self.hwnd,
+                0,
+                0,
+                0,
+                0,
+                0,
+                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE,
+            );
+        }
     }
 }
 
