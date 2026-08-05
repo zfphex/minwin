@@ -41,11 +41,11 @@ pub trait PlatformWindow {
     fn scaled_size(&self) -> (usize, usize);
     #[inline(always)]
     fn width(&self) -> usize {
-        self.scaled_size().0
+        self.size().0
     }
     #[inline(always)]
     fn height(&self) -> usize {
-        self.scaled_size().1
+        self.size().1
     }
     fn wait_for_vsync(&self);
     /// Block the calling thread until the OS queues a new window event.

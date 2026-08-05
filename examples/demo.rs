@@ -31,7 +31,7 @@ fn main() {
 
     while window.open() {
         window.draw(|win| {
-            let (w, h) = win.scaled_size();
+            let (w, h) = win.size();
             let scale = win.scale_factor() as f32;
             let w = (w as f32 * scale).round() as usize;
             let h = (h as f32 * scale).round() as usize;

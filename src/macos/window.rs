@@ -345,7 +345,7 @@ pub fn create_window(
 
 impl PlatformWindow for Window {
     fn framebuffer(&mut self) -> &mut [u32] {
-        let (w, h) = self.size();
+        let (w, h) = self.scaled_size();
         let expected_size = w * h;
 
         // Dynamically resize the internal buffer if the window size changes
@@ -454,11 +454,11 @@ impl PlatformWindow for Window {
     }
 
     fn scaled_size(&self) -> (usize, usize) {
-        let (content_width, content_height) = self.size();
+        let (width, height) = self.size();
         let scale = self.scale_factor();
         (
-            (content_width as f64 * scale).round() as usize,
-            (content_height as f64 * scale).round() as usize,
+            (width as f64 * scale).round() as usize,
+            (height as f64 * scale).round() as usize,
         )
     }
 

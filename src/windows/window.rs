@@ -416,7 +416,7 @@ impl PlatformWindow for Window {
     }
 
     fn framebuffer(&mut self) -> &mut [u32] {
-        let (width, height) = self.size();
+        let (width, height) = self.scaled_size();
 
         if self.buffer.len() != width * height {
             self.buffer.resize(width * height, 0);
@@ -429,7 +429,11 @@ impl PlatformWindow for Window {
 
     fn size(&self) -> (usize, usize) {
         let rect = self.client_area();
-        (rect.width.max(0) as usize, rect.height.max(0) as usize)
+        let scale = self.scale_factor() as f32;
+        (
+            (rect.width as f32 / scale).ceil().max(0.0) as usize,
+            (rect.height as f32 / scale).ceil().max(0.0) as usize,
+        )
     }
 
     fn present(&self) {
@@ -526,11 +530,7 @@ impl PlatformWindow for Window {
 
     fn scaled_size(&self) -> (usize, usize) {
         let rect = self.client_area();
-        let scale = self.scale_factor() as f32;
-        (
-            (rect.width as f32 / scale).round().max(0.0) as usize,
-            (rect.height as f32 / scale).round().max(0.0) as usize,
-        )
+        (rect.width.max(0) as usize, rect.height.max(0) as usize)
     }
 
     fn set_cursor_visible(&self, visible: bool) {
