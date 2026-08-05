@@ -642,6 +642,12 @@ impl PlatformWindow for Window {
 
         self.input.begin_frame();
 
+        // AppKit only reports the cursor while it is over the window or a button is held, so poll
+        // it every frame. Hover falls off on its own because the position leaves the content view.
+        unsafe {
+            self.input.mouse_pos = Some(content_point(self.ns_window, cursor_position()));
+        }
+
         // Store the closure in thread-local storage
         let repaint_ptr = &mut render as *mut F as *mut std::ffi::c_void;
         let repaint_func = |ptr: *mut std::ffi::c_void, window: &mut Window| unsafe {
@@ -907,32 +913,53 @@ fn parse_modifiers(flags: usize) -> Modifiers {
     }
 }
 
+unsafe fn content_point(ns_window: id, screen_point: NSPoint) -> (f64, f64) {
+    unsafe {
+        let point = msg_send_point_point(
+            ns_window,
+            sel_registerName(c"convertPointFromScreen:".as_ptr() as *const _),
+            screen_point,
+        );
+        let content_view =
+            msg_send_id(ns_window, sel_registerName(c"contentView".as_ptr() as *const _));
+        let frame = msg_send_rect(content_view, sel_registerName(c"frame".as_ptr() as *const _));
+        (point.x, frame.size.height - point.y)
+    }
+}
+
+unsafe fn cursor_position() -> NSPoint {
+    unsafe {
+        msg_send_point(
+            objc_getClass(c"NSEvent".as_ptr() as *const _),
+            sel_registerName(c"mouseLocation".as_ptr() as *const _),
+        )
+    }
+}
+
 unsafe fn mouse_location(ns_event: id) -> Option<(f64, f64)> {
     unsafe {
+        let active = ACTIVE_WINDOW.with(|w| w.get());
+        if active.is_null() {
+            return None;
+        }
+
         let mut point = msg_send_point(
             ns_event,
             sel_registerName(c"locationInWindow".as_ptr() as *const _),
         );
-        let mut window = msg_send_id(ns_event, sel_registerName(c"window".as_ptr() as *const _));
+        let event_window =
+            msg_send_id(ns_event, sel_registerName(c"window".as_ptr() as *const _));
 
-        // Events raised while the cursor is outside the window carry no window and their location
-        // is in screen space, so convert it into the same base space `locationInWindow` uses.
-        if window.is_null() {
-            let active = ACTIVE_WINDOW.with(|w| w.get());
-            if active.is_null() {
-                return None;
-            }
-            window = (*active).ns_window;
+        // Events raised outside the window carry no window and are already in screen space.
+        if !event_window.is_null() {
             point = msg_send_point_point(
-                window,
-                sel_registerName(c"convertPointFromScreen:".as_ptr() as *const _),
+                event_window,
+                sel_registerName(c"convertPointToScreen:".as_ptr() as *const _),
                 point,
             );
         }
 
-        let content_view = msg_send_id(window, sel_registerName(c"contentView".as_ptr() as *const _));
-        let frame = msg_send_rect(content_view, sel_registerName(c"frame".as_ptr() as *const _));
-        Some((point.x, frame.size.height - point.y))
+        Some(content_point((*active).ns_window, point))
     }
 }
 
