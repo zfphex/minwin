@@ -358,15 +358,6 @@ impl PlatformWindow for Window {
         &mut self.buffer
     }
 
-    fn size(&self) -> (usize, usize) {
-        let (content_width, content_height) = self.scaled_size();
-        let scale = self.scale_factor();
-        (
-            (content_width as f64 * scale).round() as usize,
-            (content_height as f64 * scale).round() as usize,
-        )
-    }
-
     fn present(&self) {
         if self.use_gpu {
             return;
@@ -387,13 +378,20 @@ impl PlatformWindow for Window {
                 Some(release_provider_data),
             );
 
-            let screen = msg_send_id(self.ns_window, sel_registerName(c"screen".as_ptr() as *const _));
+            let screen = msg_send_id(
+                self.ns_window,
+                sel_registerName(c"screen".as_ptr() as *const _),
+            );
             let color_space = if screen.is_null() {
                 static FALLBACK: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
                 *FALLBACK.get_or_init(|| CGColorSpaceCreateDeviceRGB() as usize) as CGColorSpaceRef
             } else {
-                let ns_cs = msg_send_id(screen, sel_registerName(c"colorSpace".as_ptr() as *const _));
-                msg_send_id(ns_cs, sel_registerName(c"CGColorSpace".as_ptr() as *const _)) as CGColorSpaceRef
+                let ns_cs =
+                    msg_send_id(screen, sel_registerName(c"colorSpace".as_ptr() as *const _));
+                msg_send_id(
+                    ns_cs,
+                    sel_registerName(c"CGColorSpace".as_ptr() as *const _),
+                ) as CGColorSpaceRef
             };
             let bitmap_info = kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little;
 
@@ -444,7 +442,7 @@ impl PlatformWindow for Window {
         }
     }
 
-    fn scaled_size(&self) -> (usize, usize) {
+    fn size(&self) -> (usize, usize) {
         unsafe {
             let frame_sel = sel_registerName(c"frame".as_ptr() as *const _);
             let frame = msg_send_rect(self.ns_view, frame_sel);
@@ -453,6 +451,15 @@ impl PlatformWindow for Window {
                 frame.size.height.round().max(0.0) as usize,
             )
         }
+    }
+
+    fn scaled_size(&self) -> (usize, usize) {
+        let (content_width, content_height) = self.size();
+        let scale = self.scale_factor();
+        (
+            (content_width as f64 * scale).round() as usize,
+            (content_height as f64 * scale).round() as usize,
+        )
     }
 
     fn wait_for_vsync(&self) {
@@ -920,9 +927,14 @@ unsafe fn content_point(ns_window: id, screen_point: NSPoint) -> (f64, f64) {
             sel_registerName(c"convertPointFromScreen:".as_ptr() as *const _),
             screen_point,
         );
-        let content_view =
-            msg_send_id(ns_window, sel_registerName(c"contentView".as_ptr() as *const _));
-        let frame = msg_send_rect(content_view, sel_registerName(c"frame".as_ptr() as *const _));
+        let content_view = msg_send_id(
+            ns_window,
+            sel_registerName(c"contentView".as_ptr() as *const _),
+        );
+        let frame = msg_send_rect(
+            content_view,
+            sel_registerName(c"frame".as_ptr() as *const _),
+        );
         (point.x, frame.size.height - point.y)
     }
 }
@@ -947,8 +959,7 @@ unsafe fn mouse_location(ns_event: id) -> Option<(f64, f64)> {
             ns_event,
             sel_registerName(c"locationInWindow".as_ptr() as *const _),
         );
-        let event_window =
-            msg_send_id(ns_event, sel_registerName(c"window".as_ptr() as *const _));
+        let event_window = msg_send_id(ns_event, sel_registerName(c"window".as_ptr() as *const _));
 
         // Events raised outside the window carry no window and are already in screen space.
         if !event_window.is_null() {
