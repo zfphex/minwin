@@ -10,6 +10,22 @@ pub unsafe fn msg_send_id(obj: id, sel: SEL) -> id {
     }
 }
 
+pub unsafe fn msg_send_point(obj: id, sel: SEL) -> NSPoint {
+    unsafe {
+        let func: unsafe extern "C" fn(id, SEL) -> NSPoint =
+            transmute(objc_msgSend as *const c_void);
+        func(obj, sel)
+    }
+}
+
+pub unsafe fn msg_send_point_point(obj: id, sel: SEL, arg1: NSPoint) -> NSPoint {
+    unsafe {
+        let func: unsafe extern "C" fn(id, SEL, NSPoint) -> NSPoint =
+            transmute(objc_msgSend as *const c_void);
+        func(obj, sel, arg1)
+    }
+}
+
 pub unsafe fn msg_send_id_id(obj: id, sel: SEL, arg1: id) -> id {
     unsafe {
         let func: unsafe extern "C" fn(id, SEL, id) -> id =

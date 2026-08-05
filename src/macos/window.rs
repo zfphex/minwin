@@ -907,6 +907,35 @@ fn parse_modifiers(flags: usize) -> Modifiers {
     }
 }
 
+unsafe fn mouse_location(ns_event: id) -> Option<(f64, f64)> {
+    unsafe {
+        let mut point = msg_send_point(
+            ns_event,
+            sel_registerName(c"locationInWindow".as_ptr() as *const _),
+        );
+        let mut window = msg_send_id(ns_event, sel_registerName(c"window".as_ptr() as *const _));
+
+        // Events raised while the cursor is outside the window carry no window and their location
+        // is in screen space, so convert it into the same base space `locationInWindow` uses.
+        if window.is_null() {
+            let active = ACTIVE_WINDOW.with(|w| w.get());
+            if active.is_null() {
+                return None;
+            }
+            window = (*active).ns_window;
+            point = msg_send_point_point(
+                window,
+                sel_registerName(c"convertPointFromScreen:".as_ptr() as *const _),
+                point,
+            );
+        }
+
+        let content_view = msg_send_id(window, sel_registerName(c"contentView".as_ptr() as *const _));
+        let frame = msg_send_rect(content_view, sel_registerName(c"frame".as_ptr() as *const _));
+        Some((point.x, frame.size.height - point.y))
+    }
+}
+
 unsafe fn mouse_from_macos_event(ns_event: id, event_type: NSEventType) -> Option<Mouse> {
     unsafe {
         match event_type {
@@ -1006,27 +1035,7 @@ unsafe fn translate_event(ns_event: id, input: &mut InputState) {
             | NSEventTypeRightMouseUp
             | NSEventTypeOtherMouseDown
             | NSEventTypeOtherMouseUp => {
-                let loc_sel = sel_registerName(c"locationInWindow".as_ptr() as *const _);
-                let loc_func: unsafe extern "C" fn(id, SEL) -> NSPoint =
-                    std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
-                let loc = loc_func(ns_event, loc_sel);
-
-                let x = loc.x;
-                let mut y = loc.y;
-
-                let window =
-                    msg_send_id(ns_event, sel_registerName(c"window".as_ptr() as *const _));
-                if !window.is_null() {
-                    let content_view = msg_send_id(
-                        window,
-                        sel_registerName(c"contentView".as_ptr() as *const _),
-                    );
-                    let frame_sel = sel_registerName(c"frame".as_ptr() as *const _);
-                    let frame = msg_send_rect(content_view, frame_sel);
-                    y = frame.size.height - loc.y;
-                }
-
-                input.mouse_pos = Some((x, y));
+                input.mouse_pos = mouse_location(ns_event);
                 if let Some(button) = mouse_from_macos_event(ns_event, event_type) {
                     if event_type == NSEventTypeLeftMouseDown
                         || event_type == NSEventTypeRightMouseDown
@@ -1048,60 +1057,24 @@ unsafe fn translate_event(ns_event: id, input: &mut InputState) {
                 }
             }
             NSEventTypeMouseMoved => {
-                let loc_sel = sel_registerName(c"locationInWindow".as_ptr() as *const _);
-                let loc_func: unsafe extern "C" fn(id, SEL) -> NSPoint =
-                    std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
-                let loc = loc_func(ns_event, loc_sel);
                 let delta_x =
                     msg_send_f64(ns_event, sel_registerName(c"deltaX".as_ptr() as *const _));
                 let delta_y =
                     msg_send_f64(ns_event, sel_registerName(c"deltaY".as_ptr() as *const _));
 
-                let x = loc.x;
-                let mut y = loc.y;
-
-                let window =
-                    msg_send_id(ns_event, sel_registerName(c"window".as_ptr() as *const _));
-                if !window.is_null() {
-                    let content_view = msg_send_id(
-                        window,
-                        sel_registerName(c"contentView".as_ptr() as *const _),
-                    );
-                    let frame_sel = sel_registerName(c"frame".as_ptr() as *const _);
-                    let frame = msg_send_rect(content_view, frame_sel);
-                    y = frame.size.height - loc.y;
-                }
-                input.mouse_pos = Some((x, y));
+                input.mouse_pos = mouse_location(ns_event);
                 input.raw_mouse_delta.0 += delta_x;
                 input.raw_mouse_delta.1 += -delta_y;
             }
             NSEventTypeLeftMouseDragged
             | NSEventTypeRightMouseDragged
             | NSEventTypeOtherMouseDragged => {
-                let loc_sel = sel_registerName(c"locationInWindow".as_ptr() as *const _);
-                let loc_func: unsafe extern "C" fn(id, SEL) -> NSPoint =
-                    std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
-                let loc = loc_func(ns_event, loc_sel);
                 let delta_x =
                     msg_send_f64(ns_event, sel_registerName(c"deltaX".as_ptr() as *const _));
                 let delta_y =
                     msg_send_f64(ns_event, sel_registerName(c"deltaY".as_ptr() as *const _));
 
-                let x = loc.x;
-                let mut y = loc.y;
-
-                let window =
-                    msg_send_id(ns_event, sel_registerName(c"window".as_ptr() as *const _));
-                if !window.is_null() {
-                    let content_view = msg_send_id(
-                        window,
-                        sel_registerName(c"contentView".as_ptr() as *const _),
-                    );
-                    let frame_sel = sel_registerName(c"frame".as_ptr() as *const _);
-                    let frame = msg_send_rect(content_view, frame_sel);
-                    y = frame.size.height - loc.y;
-                }
-                input.mouse_pos = Some((x, y));
+                input.mouse_pos = mouse_location(ns_event);
                 input.raw_mouse_delta.0 += delta_x;
                 input.raw_mouse_delta.1 += -delta_y;
                 if let Some(button) = mouse_from_macos_event(ns_event, event_type) {
@@ -1121,27 +1094,7 @@ unsafe fn translate_event(ns_event: id, input: &mut InputState) {
                 // A scroll event carries the cursor position, and on a fresh window it is the only
                 // event that arrives before the mouse has moved. Without this there is no position
                 // to hit test against, so every scroll is dropped until the mouse moves or clicks.
-                let point_func: unsafe extern "C" fn(id, SEL) -> NSPoint =
-                    std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
-                let loc = point_func(
-                    ns_event,
-                    sel_registerName(c"locationInWindow".as_ptr() as *const _),
-                );
-                let mut y = loc.y;
-                let event_window =
-                    msg_send_id(ns_event, sel_registerName(c"window".as_ptr() as *const _));
-                if !event_window.is_null() {
-                    let content_view = msg_send_id(
-                        event_window,
-                        sel_registerName(c"contentView".as_ptr() as *const _),
-                    );
-                    let frame = msg_send_rect(
-                        content_view,
-                        sel_registerName(c"frame".as_ptr() as *const _),
-                    );
-                    y = frame.size.height - loc.y;
-                }
-                input.mouse_pos = Some((loc.x, y));
+                input.mouse_pos = mouse_location(ns_event);
 
                 let usize_func: unsafe extern "C" fn(id, SEL) -> usize =
                     std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
