@@ -11,6 +11,7 @@ thread_local! {
     pub static REPAINT_FUNC: std::cell::Cell<Option<fn(*mut std::ffi::c_void, &mut Window)>> = const { std::cell::Cell::new(None) };
     static ACTIVE_WINDOW: std::cell::Cell<*mut Window> = const { std::cell::Cell::new(std::ptr::null_mut()) };
     static TRACKING_REPAINT_TIMER: std::cell::Cell<id> = const { std::cell::Cell::new(nil) };
+    static LIVE_RESIZE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 pub struct Window {
@@ -681,6 +682,11 @@ impl PlatformWindow for Window {
         // Store the closure in thread-local storage
         let repaint_ptr = &mut render as *mut F as *mut std::ffi::c_void;
         let repaint_func = |ptr: *mut std::ffi::c_void, window: &mut Window| unsafe {
+            window.input.begin_frame();
+            window.input.mouse_pos = Some(content_point(window.ns_window, cursor_position()));
+            if !LIVE_RESIZE.with(|r| r.get()) {
+                window.input.sync_mouse_buttons(pressed_mouse_buttons());
+            }
             let f = &mut *(ptr as *mut F);
             f(window);
         };
@@ -955,6 +961,17 @@ unsafe fn content_point(ns_window: id, screen_point: NSPoint) -> (f64, f64) {
             sel_registerName(c"frame".as_ptr() as *const _),
         );
         (point.x, frame.size.height - point.y)
+    }
+}
+
+unsafe fn pressed_mouse_buttons() -> usize {
+    unsafe {
+        let func: unsafe extern "C" fn(id, SEL) -> usize =
+            std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
+        func(
+            objc_getClass(c"NSEvent".as_ptr() as *const _),
+            sel_registerName(c"pressedMouseButtons".as_ptr() as *const _),
+        )
     }
 }
 
@@ -1403,11 +1420,19 @@ extern "C" fn window_will_start_live_resize(_this: id, _cmd: SEL, notification: 
             sel_registerName(c"object".as_ptr() as *const _),
         );
 
+        LIVE_RESIZE.with(|r| r.set(true));
+
+        let active = ACTIVE_WINDOW.with(|w| w.get());
+        if !active.is_null() {
+            (*active).input.cancel_mouse();
+        }
+
         start_tracking_repaint_timer(window, _this);
     }
 }
 
 extern "C" fn window_did_end_live_resize(_this: id, _cmd: SEL, _notification: id) {
+    LIVE_RESIZE.with(|r| r.set(false));
     stop_tracking_repaint_timer();
 }
 

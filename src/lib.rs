@@ -546,6 +546,36 @@ impl InputState {
         self.mouse_release_positions[index] = self.mouse_pos;
     }
 
+    pub(crate) fn cancel_mouse(&mut self) {
+        self.current_mouse = [false; MOUSE_BUTTON_COUNT];
+        self.mouse_press_positions = [None; MOUSE_BUTTON_COUNT];
+        self.mouse_press_was_double_click = [false; MOUSE_BUTTON_COUNT];
+    }
+
+    pub(crate) fn sync_mouse_buttons(&mut self, mask: usize) {
+        for (index, button) in [
+            Mouse::Left,
+            Mouse::Right,
+            Mouse::Middle,
+            Mouse::Back,
+            Mouse::Forward,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let down = mask & (1 << index) != 0;
+            if down == self.current_mouse[index] {
+                continue;
+            }
+
+            if down {
+                self.set_mouse_down(button);
+            } else {
+                self.set_mouse_up(button);
+            }
+        }
+    }
+
     fn key_index(&self, key: Key) -> Option<usize> {
         let index = key.vk_code();
         (index < self.current_keys.len()).then_some(index)
