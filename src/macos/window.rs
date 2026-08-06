@@ -257,6 +257,17 @@ pub fn create_window(
             YES,
         );
 
+        msg_send_id_usize_void(
+            ns_view,
+            sel_registerName(c"setLayerContentsRedrawPolicy:".as_ptr() as *const _),
+            0,
+        );
+        msg_send_id_usize_void(
+            ns_view,
+            sel_registerName(c"setLayerContentsPlacement:".as_ptr() as *const _),
+            11,
+        );
+
         msg_send_id_id_void(
             ns_window,
             sel_registerName(c"setContentView:".as_ptr() as *const _),
@@ -370,9 +381,10 @@ impl PlatformWindow for Window {
 
         unsafe {
             let size = self.buffer.len() * 4;
-            let data_ptr = self.buffer.as_ptr() as *const std::ffi::c_void;
+            let pixels = Box::new(self.buffer.clone());
+            let data_ptr = pixels.as_ptr() as *const std::ffi::c_void;
             let provider = CGDataProviderCreateWithData(
-                std::ptr::null_mut(),
+                Box::into_raw(pixels) as *mut std::ffi::c_void,
                 data_ptr,
                 size,
                 Some(release_provider_data),
@@ -412,6 +424,14 @@ impl PlatformWindow for Window {
             let layer_sel = sel_registerName(c"layer".as_ptr() as *const _);
             let layer = msg_send_id(self.ns_view, layer_sel);
 
+            let transaction = objc_getClass(c"CATransaction".as_ptr() as *const _);
+            msg_send_void(transaction, sel_registerName(c"begin".as_ptr() as *const _));
+            msg_send_id_bool_void(
+                transaction,
+                sel_registerName(c"setDisableActions:".as_ptr() as *const _),
+                YES,
+            );
+
             let set_contents_scale_sel =
                 sel_registerName(c"setContentsScale:".as_ptr() as *const _);
             let set_contents_scale: unsafe extern "C" fn(id, SEL, f64) =
@@ -420,9 +440,12 @@ impl PlatformWindow for Window {
 
             let set_contents_sel = sel_registerName(c"setContents:".as_ptr() as *const _);
 
-            // CoreAnimation will read the pointer contents and synchronously upload it
-            // to the GPU before the next frame is allowed to start.
             msg_send_id_id_void(layer, set_contents_sel, cg_image as id);
+
+            msg_send_void(
+                transaction,
+                sel_registerName(c"commit".as_ptr() as *const _),
+            );
 
             CFRelease(cg_image as CFTypeRef);
             CFRelease(provider as CFTypeRef);
@@ -900,15 +923,11 @@ impl Drop for Window {
 }
 
 unsafe extern "C" fn release_provider_data(
-    _info: *mut std::ffi::c_void,
+    info: *mut std::ffi::c_void,
     _data: *const std::ffi::c_void,
     _size: usize,
 ) {
-    // NO-OP.
-    // The buffer is owned by the Rust `Window` struct.
-    // We explicitly do not free the memory here. CoreAnimation safely
-    // reads this pointer and uploads it to the GPU before returning control
-    // to our event loop for the next frame.
+    unsafe { drop(Box::from_raw(info as *mut Vec<u32>)) }
 }
 
 fn parse_modifiers(flags: usize) -> Modifiers {
