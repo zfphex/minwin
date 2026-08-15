@@ -546,12 +546,14 @@ impl InputState {
         self.mouse_release_positions[index] = self.mouse_pos;
     }
 
+    #[cfg(target_os = "macos")]
     pub(crate) fn cancel_mouse(&mut self) {
         self.current_mouse = [false; MOUSE_BUTTON_COUNT];
         self.mouse_press_positions = [None; MOUSE_BUTTON_COUNT];
         self.mouse_press_was_double_click = [false; MOUSE_BUTTON_COUNT];
     }
 
+    #[cfg(target_os = "macos")]
     pub(crate) fn sync_mouse_buttons(&mut self, mask: usize) {
         for (index, button) in [
             Mouse::Left,
