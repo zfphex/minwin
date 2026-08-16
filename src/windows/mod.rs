@@ -47,6 +47,22 @@ pub type LPWSTR = *mut u16;
 unsafe extern "system" {
     pub fn DwmFlush() -> i32;
     pub fn DwmGetColorizationColor(pcrColorization: *mut u32, pfOpaqueBlend: *mut i32) -> i32;
+    pub fn DwmExtendFrameIntoClientArea(hWnd: isize, pMarInset: *const MARGINS) -> i32;
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct MARGINS {
+    pub left: i32,
+    pub right: i32,
+    pub top: i32,
+    pub bottom: i32,
+}
+
+#[repr(C)]
+pub struct NCCALCSIZE_PARAMS {
+    pub rgrc: [RECT; 3],
+    pub lppos: *mut c_void,
 }
 
 #[link(name = "Opengl32")]
@@ -96,6 +112,7 @@ unsafe extern "system" {
     pub fn GetWindowLongA(hwnd: isize, nIndex: i32) -> LONG;
     pub fn SetWindowLongA(hwnd: isize, nIndex: i32, dwNewLong: LONG) -> LONG;
     pub fn ShowWindow(hwnd: isize, nCmdShow: i32) -> BOOL;
+    pub fn IsZoomed(hwnd: isize) -> BOOL;
     pub fn GetWindowInfo(hwnd: isize, pwi: *mut WindowInfo) -> i32;
     pub fn AdjustWindowRectEx(lpRect: *mut RECT, dwStyle: u32, bMenu: i32, dwExStyle: u32) -> i32;
     pub fn GetDesktopWindow() -> isize;

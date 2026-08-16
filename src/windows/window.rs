@@ -114,6 +114,8 @@ pub fn create_window(
             native_repaint_requested: false,
             use_gpu,
             cursor: std::cell::Cell::new(CursorIcon::Arrow),
+            caption_height: 0,
+            caption_exclusions: Vec::new(),
         };
 
         //Safety: This *should* be pinned.
@@ -144,6 +146,8 @@ pub struct Window {
     native_repaint_requested: bool,
     use_gpu: bool,
     cursor: std::cell::Cell<CursorIcon>,
+    caption_height: i32,
+    caption_exclusions: Vec<Rect>,
 }
 
 impl Window {
@@ -640,6 +644,54 @@ impl PlatformWindow for Window {
         }
     }
 
+    fn custom_titlebar(&mut self, height: i32, exclusions: &[Rect]) {
+        self.caption_exclusions.clear();
+        self.caption_exclusions.extend_from_slice(exclusions);
+
+        if self.caption_height == height {
+            return;
+        }
+
+        self.caption_height = height;
+        if self.caption_height == 0 {
+            unsafe {
+                let margins = MARGINS {
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                };
+                DwmExtendFrameIntoClientArea(self.hwnd, &margins);
+                SetWindowPos(
+                    self.hwnd,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
+                );
+            }
+        }
+    }
+
+    fn minimize(&mut self) {
+        unsafe { ShowWindow(self.hwnd, SW_MINIMIZE) };
+    }
+
+    fn toggle_maximize(&mut self) {
+        let cmd = if self.maximized() {
+            SW_RESTORE
+        } else {
+            SW_MAXIMIZE
+        };
+        unsafe { ShowWindow(self.hwnd, cmd) };
+    }
+
+    fn maximized(&self) -> bool {
+        unsafe { IsZoomed(self.hwnd) != 0 }
+    }
+
     fn window_style(&mut self, style: WindowStyle) {
         unsafe {
             SetWindowLongPtrA(self.hwnd, GWL_STYLE, get_style_flags(style).0 as isize);
@@ -799,6 +851,71 @@ pub unsafe extern "system" fn wnd_proc(
             WM_SIZE => {
                 InvalidateRect(hwnd, null(), 0);
                 return 0;
+            }
+            //The client area is stretched over the whole window, hiding the native frame.
+            //A maximized window still has to leave the frame alone or it spills off screen.
+            WM_NCCALCSIZE if wparam == 1 && window.caption_height > 0 => {
+                if IsZoomed(hwnd) != 0 {
+                    let dpi = GetDpiForWindow(hwnd);
+                    let padding = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+                    let x = GetSystemMetricsForDpi(SM_CXFRAME, dpi) + padding;
+                    let y = GetSystemMetricsForDpi(SM_CYFRAME, dpi) + padding;
+                    let params = &mut *(lparam as *mut NCCALCSIZE_PARAMS);
+                    params.rgrc[0].left += x;
+                    params.rgrc[0].right -= x;
+                    params.rgrc[0].top += y;
+                    params.rgrc[0].bottom -= y;
+                }
+                return 0;
+            }
+            //The frame is gone so the resize borders have to be hit tested by hand.
+            WM_NCHITTEST if window.caption_height > 0 => {
+                let mut point = POINT {
+                    x: lparam as i16 as i32,
+                    y: (lparam >> 16) as i16 as i32,
+                };
+                ScreenToClient(hwnd, &mut point);
+                let client = window.client_area();
+
+                if IsZoomed(hwnd) == 0 {
+                    let dpi = GetDpiForWindow(hwnd);
+                    let border = GetSystemMetricsForDpi(SM_CXFRAME, dpi)
+                        + GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+                    let left = point.x < border;
+                    let right = point.x >= client.width - border;
+                    let top = point.y < border;
+                    let bottom = point.y >= client.height - border;
+
+                    let edge = match (left, right, top, bottom) {
+                        (true, _, true, _) => Some(HTTOPLEFT),
+                        (_, true, true, _) => Some(HTTOPRIGHT),
+                        (true, _, _, true) => Some(HTBOTTOMLEFT),
+                        (_, true, _, true) => Some(HTBOTTOMRIGHT),
+                        (true, ..) => Some(HTLEFT),
+                        (_, true, ..) => Some(HTRIGHT),
+                        (_, _, true, _) => Some(HTTOP),
+                        (.., true) => Some(HTBOTTOM),
+                        _ => None,
+                    };
+
+                    if let Some(edge) = edge {
+                        return edge;
+                    }
+                }
+
+                let x = (point.x as f32 / window.display_scale) as i32;
+                let y = (point.y as f32 / window.display_scale) as i32;
+
+                if y >= window.caption_height
+                    || window
+                        .caption_exclusions
+                        .iter()
+                        .any(|rect| rect.contains(x, y))
+                {
+                    return HTCLIENT as isize;
+                }
+
+                return HTCAPTION;
             }
             // Without this the class cursor is restored on every move, undoing set_cursor_icon.
             WM_SETCURSOR if low == HTCLIENT => {

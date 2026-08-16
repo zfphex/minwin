@@ -9,7 +9,18 @@ pub const WM_PAINT: u32 = 0x000F;
 pub const WM_CLOSE: u32 = 0x0010;
 pub const WM_QUIT: u32 = 0x0012;
 pub const WM_SETCURSOR: u32 = 0x0020;
+pub const WM_NCCALCSIZE: u32 = 0x0083;
+pub const WM_NCHITTEST: u32 = 0x0084;
 pub const HTCLIENT: usize = 1;
+pub const HTCAPTION: isize = 2;
+pub const HTLEFT: isize = 10;
+pub const HTRIGHT: isize = 11;
+pub const HTTOP: isize = 12;
+pub const HTTOPLEFT: isize = 13;
+pub const HTTOPRIGHT: isize = 14;
+pub const HTBOTTOM: isize = 15;
+pub const HTBOTTOMLEFT: isize = 16;
+pub const HTBOTTOMRIGHT: isize = 17;
 pub const WM_KEYDOWN: u32 = 0x0100;
 pub const WM_KEYUP: u32 = 0x0101;
 pub const WM_CHAR: u32 = 0x0102;
@@ -70,6 +81,14 @@ pub const IDC_SIZENS: *const u16 = 32645 as *const u16;
 pub const IDC_HAND: *const u16 = 32649 as *const u16;
 
 pub const GWL_STYLE: i32 = -16;
+
+pub const SM_CXFRAME: i32 = 32;
+pub const SM_CYFRAME: i32 = 33;
+pub const SM_CXPADDEDBORDER: i32 = 92;
+
+pub const SW_MAXIMIZE: i32 = 3;
+pub const SW_MINIMIZE: i32 = 6;
+pub const SW_RESTORE: i32 = 9;
 
 pub const SWP_NOSIZE: u32 = 0x0001;
 pub const SWP_NOMOVE: u32 = 0x0002;
