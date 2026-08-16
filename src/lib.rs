@@ -726,4 +726,12 @@ impl Rect {
             height: self.height.saturating_sub(2 * h),
         }
     }
+    pub const fn outer(&self, w: i32, h: i32) -> Rect {
+        Rect {
+            x: self.x.saturating_sub(w),
+            y: self.y.saturating_sub(h),
+            width: self.width.saturating_add(2 * w),
+            height: self.height.saturating_add(2 * h),
+        }
+    }
 }
