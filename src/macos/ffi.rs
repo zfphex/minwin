@@ -182,12 +182,48 @@ unsafe extern "C" {
 // Grand Central Dispatch (GCD) Semaphores
 pub type dispatch_semaphore_t = *mut std::ffi::c_void;
 pub const DISPATCH_TIME_FOREVER: u64 = !0u64;
+pub const DISPATCH_TIME_NOW: u64 = 0;
 
 unsafe extern "C" {
     pub fn dispatch_semaphore_create(value: isize) -> dispatch_semaphore_t;
     pub fn dispatch_semaphore_signal(dsema: dispatch_semaphore_t) -> isize;
     pub fn dispatch_semaphore_wait(dsema: dispatch_semaphore_t, timeout: u64) -> isize;
     pub fn dispatch_release(object: *mut std::ffi::c_void);
+}
+
+pub type CFRunLoopRef = *mut std::ffi::c_void;
+pub type CFRunLoopSourceRef = *mut std::ffi::c_void;
+
+#[repr(C)]
+pub struct CFRunLoopSourceContext {
+    pub version: isize,
+    pub info: *mut std::ffi::c_void,
+    pub retain: *const std::ffi::c_void,
+    pub release: *const std::ffi::c_void,
+    pub copyDescription: *const std::ffi::c_void,
+    pub equal: *const std::ffi::c_void,
+    pub hash: *const std::ffi::c_void,
+    pub schedule: *const std::ffi::c_void,
+    pub cancel: *const std::ffi::c_void,
+    pub perform: Option<unsafe extern "C" fn(*mut std::ffi::c_void)>,
+}
+
+#[link(name = "CoreFoundation", kind = "framework")]
+unsafe extern "C" {
+    pub static kCFRunLoopDefaultMode: CFStringRef;
+    pub static kCFRunLoopCommonModes: CFStringRef;
+    pub fn CFRunLoopGetMain() -> CFRunLoopRef;
+    pub fn CFRunLoopWakeUp(rl: CFRunLoopRef);
+    pub fn CFRunLoopRunInMode(mode: CFStringRef, seconds: f64, return_after_source_handled: bool)
+    -> i32;
+    pub fn CFRunLoopSourceCreate(
+        allocator: *const std::ffi::c_void,
+        order: isize,
+        context: *mut CFRunLoopSourceContext,
+    ) -> CFRunLoopSourceRef;
+    pub fn CFRunLoopSourceSignal(source: CFRunLoopSourceRef);
+    pub fn CFRunLoopAddSource(rl: CFRunLoopRef, source: CFRunLoopSourceRef, mode: CFStringRef);
+    pub fn CFRunLoopSourceInvalidate(source: CFRunLoopSourceRef);
 }
 
 // CoreGraphics cursor association

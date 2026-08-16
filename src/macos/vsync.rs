@@ -15,20 +15,38 @@ struct CallbackContext {
     semaphore: dispatch_semaphore_t,
     waiting: AtomicBool,
     mode: VsyncMode,
+    run_loop: CFRunLoopRef,
+    source: CFRunLoopSourceRef,
 }
+
+unsafe impl Send for CallbackContext {}
+unsafe impl Sync for CallbackContext {}
 
 impl Drop for CallbackContext {
     fn drop(&mut self) {
         unsafe {
+            CFRunLoopSourceInvalidate(self.source);
+            CFRelease(self.source);
             dispatch_release(self.semaphore);
         }
     }
 }
 
+unsafe extern "C" fn wake_perform(_info: *mut std::ffi::c_void) {}
+
 fn notify_vsync_waiter(context: &CallbackContext) {
+    // The main thread blocks inside CFRunLoopRunInMode, not on the semaphore alone, so that
+    // mach sources (accessibility requests from window managers) keep being serviced between
+    // frames. Signalling the source is what lets that wait return immediately on a display tick.
+    let wake = || unsafe {
+        CFRunLoopSourceSignal(context.source);
+        CFRunLoopWakeUp(context.run_loop);
+    };
+
     match context.mode {
         VsyncMode::AlwaysSignal => unsafe {
             dispatch_semaphore_signal(context.semaphore);
+            wake();
         },
         VsyncMode::ArmGated => {
             // Signal only an active waiter. Signalling every display tick turns
@@ -40,6 +58,7 @@ fn notify_vsync_waiter(context: &CallbackContext) {
                 unsafe {
                     dispatch_semaphore_signal(context.semaphore);
                 }
+                wake();
             }
         }
     }
@@ -83,10 +102,28 @@ impl VsyncTracker {
                 panic!("Failed to create GCD semaphore");
             }
 
+            let mut context = CFRunLoopSourceContext {
+                version: 0,
+                info: std::ptr::null_mut(),
+                retain: std::ptr::null(),
+                release: std::ptr::null(),
+                copyDescription: std::ptr::null(),
+                equal: std::ptr::null(),
+                hash: std::ptr::null(),
+                schedule: std::ptr::null(),
+                cancel: std::ptr::null(),
+                perform: Some(wake_perform),
+            };
+            let source = CFRunLoopSourceCreate(std::ptr::null(), 0, &mut context);
+            let run_loop = CFRunLoopGetMain();
+            CFRunLoopAddSource(run_loop, source, kCFRunLoopCommonModes);
+
             let mut callback_context = Box::new(CallbackContext {
                 semaphore,
                 waiting: AtomicBool::new(false),
                 mode,
+                run_loop,
+                source,
             });
 
             let callback_res = CVDisplayLinkSetOutputCallback(
@@ -129,7 +166,12 @@ impl VsyncTracker {
                 // Ticks while idle leave waiting false and do not signal.
                 self.callback_context.waiting.store(true, Ordering::SeqCst);
             }
-            dispatch_semaphore_wait(self.callback_context.semaphore, DISPATCH_TIME_FOREVER);
+            // Poll the semaphore, but idle inside the run loop so the main thread stays
+            // responsive to mach messages. The timeout is only a fallback for a stalled
+            // display link; the display-link callback signals our source to return early.
+            while dispatch_semaphore_wait(self.callback_context.semaphore, DISPATCH_TIME_NOW) != 0 {
+                CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, true);
+            }
         }
     }
 }
