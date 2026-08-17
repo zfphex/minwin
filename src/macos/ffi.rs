@@ -53,6 +53,7 @@ pub const NSWindowStyleMaskClosable: NSWindowStyleMask = 1 << 1;
 pub const NSWindowStyleMaskMiniaturizable: NSWindowStyleMask = 1 << 2;
 pub const NSWindowStyleMaskResizable: NSWindowStyleMask = 1 << 3;
 pub const NSWindowStyleMaskFullScreen: NSWindowStyleMask = 1 << 14;
+pub const NSWindowStyleMaskFullSizeContentView: NSWindowStyleMask = 1 << 15;
 
 // NSBackingStoreType
 pub type NSBackingStoreType = usize;

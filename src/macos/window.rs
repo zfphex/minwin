@@ -25,6 +25,8 @@ pub struct Window {
     input: InputState,
     open: bool,
     use_gpu: bool,
+    pub caption_height: i32,
+    pub caption_exclusions: Vec<Rect>,
     _marker: std::marker::PhantomData<*mut ()>,
 }
 
@@ -350,6 +352,8 @@ pub fn create_window(
             width: 0,
             height: 0,
             use_gpu,
+            caption_height: 0,
+            caption_exclusions: Vec::new(),
             _marker: std::marker::PhantomData,
         })
     }
@@ -897,6 +901,102 @@ impl PlatformWindow for Window {
                 mode,
                 NO,
             );
+        }
+    }
+    
+    fn custom_titlebar(&mut self, height: i32, exclusions: &[Rect]) {
+        self.caption_exclusions.clear();
+        self.caption_exclusions.extend_from_slice(exclusions);
+
+        if self.caption_height == height {
+            return;
+        }
+        self.caption_height = height;
+
+        let custom = height > 0;
+        unsafe {
+            let mask_func: unsafe extern "C" fn(id, SEL) -> NSWindowStyleMask =
+                std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
+            let mut mask = mask_func(
+                self.ns_window,
+                sel_registerName(c"styleMask".as_ptr() as *const _),
+            );
+            if custom {
+                mask |= NSWindowStyleMaskTitled
+                    | NSWindowStyleMaskClosable
+                    | NSWindowStyleMaskMiniaturizable
+                    | NSWindowStyleMaskResizable
+                    | NSWindowStyleMaskFullSizeContentView;
+            } else {
+                mask &= !NSWindowStyleMaskFullSizeContentView;
+            }
+            msg_send_id_usize_void(
+                self.ns_window,
+                sel_registerName(c"setStyleMask:".as_ptr() as *const _),
+                mask,
+            );
+
+            msg_send_id_bool_void(
+                self.ns_window,
+                sel_registerName(c"setTitlebarAppearsTransparent:".as_ptr() as *const _),
+                if custom { YES } else { NO },
+            );
+            msg_send_id_usize_void(
+                self.ns_window,
+                sel_registerName(c"setTitleVisibility:".as_ptr() as *const _),
+                if custom { 1 } else { 0 },
+            );
+
+            let button_func: unsafe extern "C" fn(id, SEL, usize) -> id =
+                std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
+            let button_sel = sel_registerName(c"standardWindowButton:".as_ptr() as *const _);
+            for kind in 0..3 {
+                let button = button_func(self.ns_window, button_sel, kind);
+                if !button.is_null() {
+                    msg_send_id_bool_void(
+                        button,
+                        sel_registerName(c"setHidden:".as_ptr() as *const _),
+                        if custom { YES } else { NO },
+                    );
+                }
+            }
+
+            msg_send_id_id_void(
+                self.ns_window,
+                sel_registerName(c"makeFirstResponder:".as_ptr() as *const _),
+                self.ns_view,
+            );
+        }
+    }
+
+    fn minimize(&mut self) {
+        unsafe {
+            msg_send_id_id_void(
+                self.ns_window,
+                sel_registerName(c"miniaturize:".as_ptr() as *const _),
+                nil,
+            )
+        };
+    }
+
+    fn toggle_maximize(&mut self) {
+        unsafe {
+            msg_send_id_id_void(
+                self.ns_window,
+                sel_registerName(c"zoom:".as_ptr() as *const _),
+                nil,
+            )
+        };
+    }
+
+    fn maximized(&self) -> bool {
+        unsafe {
+            let func: unsafe extern "C" fn(id, SEL) -> BOOL =
+                std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
+            func(
+                self.ns_window,
+                sel_registerName(c"isZoomed".as_ptr() as *const _),
+            ) != NO
         }
     }
 }
@@ -1529,16 +1629,42 @@ extern "C" fn view_key_up(_this: id, _cmd: SEL, _event: id) {
     // Consume keyboard events so AppKit does not NSBeep() for unhandled keys.
 }
 
-extern "C" fn view_mouse_down(this: id, _cmd: SEL, _event: id) {
+extern "C" fn view_mouse_down(this: id, _cmd: SEL, event: id) {
     unsafe {
         let window = msg_send_id(this, sel_registerName(c"window".as_ptr() as *const _));
-        if !window.is_null() {
-            msg_send_id_id_void(
-                window,
-                sel_registerName(c"makeFirstResponder:".as_ptr() as *const _),
-                this,
-            );
+        if window.is_null() {
+            return;
         }
+        msg_send_id_id_void(
+            window,
+            sel_registerName(c"makeFirstResponder:".as_ptr() as *const _),
+            this,
+        );
+
+        // A click in the caption strip is handed back to AppKit so the window drags, snaps and
+        // zooms on double click exactly like a native title bar would.
+        let active = ACTIVE_WINDOW.with(|w| w.get());
+        if active.is_null() || (*active).ns_window != window || (*active).caption_height == 0 {
+            return;
+        }
+        let Some((x, y)) = mouse_location(event) else {
+            return;
+        };
+        let (x, y) = (x as i32, y as i32);
+        if y >= (*active).caption_height
+            || (*active)
+                .caption_exclusions
+                .iter()
+                .any(|rect| rect.contains(x, y))
+        {
+            return;
+        }
+
+        msg_send_id_id_void(
+            window,
+            sel_registerName(c"performWindowDragWithEvent:".as_ptr() as *const _),
+            event,
+        );
     }
 }
 
