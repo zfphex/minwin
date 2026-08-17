@@ -11,6 +11,7 @@ fn main() {
     println!("  [P] - Copy 'Hello from minwin!' to clipboard");
     println!("  [O] - Read and print clipboard contents");
     println!("  [T] - Change window title");
+    println!("  [B] - Toggle a custom 32px title bar (drag it to move the window)");
     println!("  [Drop Files] - Drop files onto the window to print their paths");
 
     let mut frame_count = 0;
@@ -28,6 +29,7 @@ fn main() {
 
     let mut cursor_visible = true;
     let mut cursor_grabbed = false;
+    let mut caption_height = 0;
 
     while window.open() {
         window.draw(|win| {
@@ -47,6 +49,13 @@ fn main() {
                 }
             }
             *frame += 2;
+
+            let caption = (caption_height as f32 * scale).round() as usize;
+            for y in 0..caption.min(h) {
+                for x in 0..w {
+                    pixels[y * w + x] = 0xFF1E1E28;
+                }
+            }
 
             win.present();
         });
@@ -95,6 +104,12 @@ fn main() {
                 }
                 _ => {}
             }
+        }
+
+        if window.pressed(Key::Char('B')) {
+            caption_height = if caption_height == 0 { 32 } else { 0 };
+            window.custom_titlebar(caption_height, &[]);
+            println!("Set custom title bar height: {}", caption_height);
         }
 
         let raw_delta = window.raw_mouse_delta();
