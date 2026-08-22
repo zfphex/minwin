@@ -788,7 +788,7 @@ unsafe fn handle_raw_input(lparam: isize, input: &mut InputState) -> bool {
 
     let mouse = unsafe { raw_input.data.mouse };
     input.raw_mouse_delta.0 += mouse.lLastX as f64;
-    input.raw_mouse_delta.1 += mouse.lLastY as f64;
+    input.raw_mouse_delta.1 -= mouse.lLastY as f64;
     true
 }
 
