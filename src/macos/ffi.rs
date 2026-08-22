@@ -215,8 +215,11 @@ unsafe extern "C" {
     pub static kCFRunLoopCommonModes: CFStringRef;
     pub fn CFRunLoopGetMain() -> CFRunLoopRef;
     pub fn CFRunLoopWakeUp(rl: CFRunLoopRef);
-    pub fn CFRunLoopRunInMode(mode: CFStringRef, seconds: f64, return_after_source_handled: bool)
-    -> i32;
+    pub fn CFRunLoopRunInMode(
+        mode: CFStringRef,
+        seconds: f64,
+        return_after_source_handled: bool,
+    ) -> i32;
     pub fn CFRunLoopSourceCreate(
         allocator: *const std::ffi::c_void,
         order: isize,
@@ -241,3 +244,10 @@ pub const NSEventPhaseChanged: usize = 1 << 2;
 pub const NSEventPhaseEnded: usize = 1 << 3;
 pub const NSEventPhaseCancelled: usize = 1 << 4;
 pub const NSEventPhaseMayBegin: usize = 1 << 5;
+
+unsafe extern "C" {
+    pub fn object_getClass(obj: id) -> Class;
+    pub fn class_getMethodImplementation(cls: Class, name: SEL) -> *mut std::ffi::c_void;
+    pub fn objc_autoreleasePoolPush() -> *mut std::ffi::c_void;
+    pub fn objc_autoreleasePoolPop(pool: *mut std::ffi::c_void);
+}

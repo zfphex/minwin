@@ -2,6 +2,48 @@ use crate::ffi::*;
 use std::mem::transmute;
 use std::os::raw::c_void;
 
+/// Resolve a selector once and cache it at the call site.
+#[macro_export]
+macro_rules! sel {
+    ($name:literal) => {{
+        static CACHE: ::std::sync::atomic::AtomicPtr<::std::ffi::c_void> =
+            ::std::sync::atomic::AtomicPtr::new(::std::ptr::null_mut());
+        let mut s = CACHE.load(::std::sync::atomic::Ordering::Relaxed);
+        if s.is_null() {
+            #[allow(unused_unsafe)]
+            let registered =
+                unsafe { $crate::ffi::sel_registerName(concat!($name, "\0").as_ptr() as *const _) };
+            s = registered as *mut _;
+            CACHE.store(s, ::std::sync::atomic::Ordering::Relaxed);
+        }
+        s as $crate::ffi::SEL
+    }};
+}
+
+#[macro_export]
+macro_rules! class {
+    ($name:literal) => {{
+        static CACHE: ::std::sync::atomic::AtomicPtr<::std::ffi::c_void> =
+            ::std::sync::atomic::AtomicPtr::new(::std::ptr::null_mut());
+        let mut c = CACHE.load(::std::sync::atomic::Ordering::Relaxed);
+        if c.is_null() {
+            #[allow(unused_unsafe)]
+            let looked_up =
+                unsafe { $crate::ffi::objc_getClass(concat!($name, "\0").as_ptr() as *const _) };
+            c = looked_up as *mut _;
+            if !c.is_null() {
+                CACHE.store(c, ::std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+        c as $crate::ffi::Class
+    }};
+}
+
+/// Look up the implementation of an instance method so hot call sites can skip.
+pub unsafe fn imp_of(obj: id, sel: SEL) -> *mut c_void {
+    unsafe { class_getMethodImplementation(object_getClass(obj), sel) }
+}
+
 // Basic msgSend wrappers
 pub unsafe fn msg_send_id(obj: id, sel: SEL) -> id {
     unsafe {
