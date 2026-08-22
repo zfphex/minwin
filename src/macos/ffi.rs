@@ -75,7 +75,7 @@ pub const NSEventTypeOtherMouseDown: NSEventType = 25;
 pub const NSEventTypeOtherMouseUp: NSEventType = 26;
 pub const NSEventTypeOtherMouseDragged: NSEventType = 27;
 
-pub const NSEventMaskAny: u64 = std::u64::MAX;
+pub const NSEventMaskAny: u64 = u64::MAX;
 
 // Activation policy
 pub type NSApplicationActivationPolicy = isize;
