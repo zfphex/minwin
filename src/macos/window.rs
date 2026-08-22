@@ -563,6 +563,10 @@ impl PlatformWindow for Window {
         #[cfg(debug_assertions)]
         assert_main_thread();
 
+        // Refresh once here so size(), scale_factor() and framebuffer() all agree
+        // for the whole frame. 
+        unsafe { refresh_metrics(self as *mut Window) };
+
         self.input.begin_frame();
 
         // AppKit only reports the cursor while it is over the window or a button is held, so poll
@@ -1137,13 +1141,6 @@ pub fn register_delegate_class() -> Class {
 
         class_addMethod(
             cls,
-            sel!("windowDidChangeBackingProperties:"),
-            std::mem::transmute(window_did_change_backing as *const std::ffi::c_void),
-            c"v@:@".as_ptr() as *const _,
-        );
-
-        class_addMethod(
-            cls,
             sel!("windowDidBecomeKey:"),
             std::mem::transmute(window_did_become_key as *const std::ffi::c_void),
             c"v@:@".as_ptr() as *const _,
@@ -1188,6 +1185,7 @@ unsafe fn repaint_window(window: id) {
 
         if let (Some(ptr), Some(func)) = (callback_opt, func_opt) {
             if !active_window.is_null() && (*active_window).ns_window == window {
+                refresh_metrics(active_window);
                 func(ptr, &mut *active_window);
             }
         }
@@ -1293,10 +1291,9 @@ extern "C" fn window_will_start_live_resize(_this: id, _cmd: SEL, notification: 
     }
 }
 
-extern "C" fn window_did_end_live_resize(_this: id, _cmd: SEL, notification: id) {
+extern "C" fn window_did_end_live_resize(_this: id, _cmd: SEL, _notification: id) {
     LIVE_RESIZE.with(|r| r.set(false));
     stop_tracking_repaint_timer();
-    unsafe { refresh_active_metrics(msg_send_id(notification, sel!("object"))) };
 }
 
 extern "C" fn live_resize_tick(_this: id, _cmd: SEL, timer: id) {
@@ -1311,28 +1308,8 @@ extern "C" fn live_resize_tick(_this: id, _cmd: SEL, timer: id) {
 extern "C" fn window_did_resize(_this: id, _cmd: SEL, notification: id) {
     unsafe {
         let window: id = msg_send_id(notification, sel!("object"));
-        refresh_active_metrics(window);
         // Repaint while AppKit is inside its live-resize tracking loop.
         repaint_window(window);
-    }
-}
-
-extern "C" fn window_did_change_backing(_this: id, _cmd: SEL, notification: id) {
-    unsafe {
-        let window: id = msg_send_id(notification, sel!("object"));
-        refresh_active_metrics(window);
-        repaint_window(window);
-    }
-}
-
-/// Delegate callbacks only carry the NSWindow, so map it back to the Window
-/// currently being driven before refreshing its cached metrics.
-unsafe fn refresh_active_metrics(ns_window: id) {
-    unsafe {
-        let active = ACTIVE_WINDOW.with(|w| w.get());
-        if !active.is_null() && (*active).ns_window == ns_window {
-            refresh_metrics(active);
-        }
     }
 }
 
