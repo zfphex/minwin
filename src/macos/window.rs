@@ -564,7 +564,7 @@ impl PlatformWindow for Window {
         assert_main_thread();
 
         // Refresh once here so size(), scale_factor() and framebuffer() all agree
-        // for the whole frame. 
+        // for the whole frame.
         unsafe { refresh_metrics(self as *mut Window) };
 
         self.input.begin_frame();
