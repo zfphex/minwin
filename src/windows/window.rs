@@ -14,6 +14,9 @@ pub fn create_window(
             panic!("Only Windows 10 (1607) or later is supported.")
         };
 
+        //The title doubles as the window class name, which cannot be empty.
+        assert!(!title.is_empty(), "window title cannot be empty");
+
         //Title must be null terminated.
         let title = std::ffi::CString::new(title).unwrap();
 
