@@ -86,6 +86,8 @@ pub const SM_CXFRAME: i32 = 32;
 pub const SM_CYFRAME: i32 = 33;
 pub const SM_CXPADDEDBORDER: i32 = 92;
 
+pub const SW_HIDE: i32 = 0;
+pub const SW_SHOWNORMAL: i32 = 1;
 pub const SW_MAXIMIZE: i32 = 3;
 pub const SW_MINIMIZE: i32 = 6;
 pub const SW_RESTORE: i32 = 9;

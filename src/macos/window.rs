@@ -826,6 +826,30 @@ impl PlatformWindow for Window {
         }
     }
 
+    fn show(&mut self) {
+        unsafe {
+            msg_send_id_id_void(self.ns_window, sel!("makeKeyAndOrderFront:"), nil);
+            refresh_metrics(self as *mut Window);
+        }
+    }
+
+    fn hide(&mut self) {
+        unsafe { msg_send_id_id_void(self.ns_window, sel!("orderOut:"), nil) };
+    }
+
+    fn set_size(&mut self, width: i32, height: i32) {
+        unsafe {
+            let size = NSSize {
+                width: width as f64,
+                height: height as f64,
+            };
+            let set_content_size: unsafe extern "C" fn(id, SEL, NSSize) =
+                std::mem::transmute(objc_msgSend as *const std::ffi::c_void);
+            set_content_size(self.ns_window, sel!("setContentSize:"), size);
+            refresh_metrics(self as *mut Window);
+        }
+    }
+
     fn minimize(&mut self) {
         unsafe { msg_send_id_id_void(self.ns_window, sel!("miniaturize:"), nil) };
     }

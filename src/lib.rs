@@ -18,6 +18,9 @@ pub trait PlatformWindow {
     fn fullscreen_mode(&mut self, mode: Fullscreen);
     /// Removes the native title bar while keeping resizing and snapping.
     fn custom_titlebar(&mut self, height: i32, exclusions: &[Rect]);
+    fn show(&mut self);
+    fn hide(&mut self);
+    fn set_size(&mut self, width: i32, height: i32);
     fn minimize(&mut self);
     fn toggle_maximize(&mut self);
     fn maximized(&self) -> bool;

@@ -678,6 +678,20 @@ impl PlatformWindow for Window {
         }
     }
 
+    fn show(&mut self) {
+        unsafe { ShowWindow(self.hwnd, SW_SHOWNORMAL) };
+    }
+
+    fn hide(&mut self) {
+        unsafe { ShowWindow(self.hwnd, SW_HIDE) };
+    }
+
+    fn set_size(&mut self, width: i32, height: i32) {
+        unsafe {
+            SetWindowPos(self.hwnd, 0, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER);
+        }
+    }
+
     fn minimize(&mut self) {
         unsafe { ShowWindow(self.hwnd, SW_MINIMIZE) };
     }
